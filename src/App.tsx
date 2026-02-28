@@ -1,9 +1,11 @@
 import { AppShell, Burger, MantineProvider } from "@mantine/core"
 import { useDisclosure } from "@mantine/hooks"
 import { useEffect, useState } from "react"
-import { theme } from "./theme"
+import Navbar from "./Navbar"
 import SplatFactory, { type MainModule } from "./wasm/splat"
 import "@mantine/core/styles.css"
+
+import "./App.css"
 
 export default function App() {
   const [splatModule, setSplatModule] = useState<MainModule | null>(null)
@@ -18,7 +20,7 @@ export default function App() {
   const [opened, { toggle }] = useDisclosure()
 
   return (
-    <MantineProvider theme={theme}>
+    <MantineProvider defaultColorScheme="dark">
       <AppShell
         padding="md"
         header={{ height: 60 }}
@@ -31,10 +33,14 @@ export default function App() {
         <AppShell.Header>
           <Burger opened={opened} onClick={toggle} hiddenFrom="sm" size="sm" />
 
-          <div>Logo</div>
+          <div id="logoArea">
+            <h1 id="title">waveguide.dev</h1>
+          </div>
         </AppShell.Header>
 
-        <AppShell.Navbar>Navbar</AppShell.Navbar>
+        <AppShell.Navbar>
+          <Navbar />
+        </AppShell.Navbar>
 
         <AppShell.Main>Main</AppShell.Main>
       </AppShell>

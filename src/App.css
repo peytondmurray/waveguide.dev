@@ -1,0 +1,10 @@
+#logoArea {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  height: 100%;
+}
+
+#title {
+  margin: 0;
+}
