@@ -2,10 +2,8 @@
   padding-left: 1em;
   padding-right: 1em;
 }
-.sectionTitle {
-  margin-bottom: 0.5em;
-}
 
 .section {
+  margin-top: 1em;
   gap: 0.5em;
 }

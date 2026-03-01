@@ -2,7 +2,7 @@ import { AppShell, Burger, MantineProvider } from "@mantine/core"
 import { useDisclosure } from "@mantine/hooks"
 import { useEffect, useState } from "react"
 import Navbar from "./Navbar"
-import SplatFactory, { type MainModule } from "./wasm/splat"
+import SplatFactory, { type MainModule } from "splat-web"
 import "@mantine/core/styles.css"
 
 import "./App.css"
