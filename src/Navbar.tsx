@@ -1,11 +1,15 @@
-import { Group, NumberInput, Select, Stack, TextInput } from "@mantine/core"
+import { Button, Group, NumberInput, Select, Stack, TextInput } from "@mantine/core"
 import "./Navbar.css"
 import { type IConfig } from "./config"
 
 import { useAtom } from "jotai"
 import { configAtom } from "./atoms"
 
-export default function Navbar() {
+export default function Navbar({
+  handleRun
+} : {
+    handleRun: () => void
+}) {
 
   const [config, setConfig] = useAtom(configAtom)
 
@@ -150,6 +154,9 @@ export default function Navbar() {
           />
           <NumberInput label="Transparency [%]" min={0} max={100} {...makeProps('display', 'transparency', Number)} />
         </Group>
+      </Stack>
+      <Stack className="section">
+        <Button onClick={handleRun}>Run simulation</Button>
       </Stack>
     </div>
   )

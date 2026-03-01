@@ -3,9 +3,15 @@ import { useDisclosure } from "@mantine/hooks"
 import { useEffect, useState } from "react"
 import Navbar from "./Navbar"
 import SplatFactory, { type MainModule } from "splat-web"
+import Map from "./Map"
+import { downloadTiles, getTiles } from "./util"
+
 import "@mantine/core/styles.css"
 
 import "./App.css"
+import { useAtom } from "jotai"
+import { configAtom } from "./atoms"
+import type { IConfig } from "./config"
 
 export default function App() {
   const [splatModule, setSplatModule] = useState<MainModule | null>(null)
@@ -13,11 +19,41 @@ export default function App() {
     SplatFactory({ noInitialRun: true }).then((mod) => setSplatModule(mod))
   }, [])
 
-  if (splatModule !== null) {
-    console.log(splatModule)
-  }
-
+  const [config, _setConfig] = useAtom(configAtom)
   const [opened, { toggle }] = useDisclosure()
+
+  async function handleRun() {
+    if (splatModule !== null) {
+
+      await downloadTiles(
+        splatModule,
+        config.transmitter.latitude,
+        config.transmitter.longitude,
+        config.simulationOptions.maxRange,
+      )
+
+      splatModule.callMain([
+        "-t",
+        "tx.qth",
+        "-L",
+        config.receiver.heightAGL,
+        "-metric",
+        config.simulationOptions.maxRange / 1000,
+        "-sc",
+        "-gc",
+        config.environment.clutterHeight,
+        "-ngs",
+        "-N",
+        "-o",
+        "output.ppm",
+        "-dbm",
+        "-db",
+        config.display.minimumSignal,
+        "-kml",
+        "-olditm"
+      ])
+    }
+  }
 
   return (
     <MantineProvider defaultColorScheme="dark">
@@ -39,10 +75,12 @@ export default function App() {
         </AppShell.Header>
 
         <AppShell.Navbar>
-          <Navbar />
+          {splatModule === null ? <p>Loading...</p> : <Navbar handleRun={handleRun} />}
         </AppShell.Navbar>
 
-        <AppShell.Main>Main</AppShell.Main>
+        <AppShell.Main>
+          <Map />
+        </AppShell.Main>
       </AppShell>
     </MantineProvider>
   )

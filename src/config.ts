@@ -39,7 +39,7 @@ const DefaultConfig: IConfig = {
   siteName: "default",
   transmitter: {
     latitude: 40,
-    longitude: -128,
+    longitude: -108,
     power: 0.125,
     frequency: 907,
     heightAGL: 1,

@@ -8,3 +8,8 @@
 #title {
   margin: 0;
 }
+
+/* Needed to make the map fill the vertical space */
+.mantine-AppShell-main {
+  height: 100vh;
+}
