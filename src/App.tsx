@@ -11,7 +11,7 @@ import "@mantine/core/styles.css"
 
 import "./App.css"
 import { useAtom } from "jotai"
-import { configAtom } from "./atoms"
+import { configAtom, progressAtom } from "./atoms"
 
 export default function App() {
   const [splatModule, setSplatModule] = useState<MainModule | null>(null)
@@ -23,19 +23,18 @@ export default function App() {
   }, [])
 
   const [config, _setConfig] = useAtom(configAtom)
+  const [_progress, setProgress] = useAtom(progressAtom)
   const [opened, { toggle }] = useDisclosure()
 
   async function handleRun() {
     if (splatModule !== null && srtm2sdfModule !== null) {
-      // await loadTiles(
-      //   splatModule,
-      // )
       await downloadTiles(
         splatModule,
         srtm2sdfModule,
         config.transmitter.latitude,
         config.transmitter.longitude,
         config.simulationOptions.maxRange,
+        setProgress,
       )
 
       splatModule.callMain([

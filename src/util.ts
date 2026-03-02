@@ -5,6 +5,7 @@ type Tile = {
   latMax: number
   longMin: number
   longMax: number
+  shortHgtName: string
   hgtName: string
   sdfName: string
   sdfHDName: string
@@ -75,6 +76,7 @@ function listTiles(lat: number, long: number, maxRange: number): Tile[] {
         latMax: phi + 1,
         longMin,
         longMax,
+        shortHgtName: `${ns}${absPhi}${ew}${absLambda}.hgt.gz`,
         hgtName: `${ns}${absPhi}/${ns}${absPhi}${ew}${absLambda}.hgt.gz`,
         sdfName: `${phi}:${phi + 1}:${longMin}:${longMax}.sdf`,
         sdfHDName: `${phi}:${phi + 1}:${longMin}:${longMax}-hd.sdf`,
@@ -108,42 +110,19 @@ export async function downloadTiles(
   lat: number,
   long: number,
   maxRange: number,
+  progressCallback: ({
+    value,
+    label,
+  }: {
+    value: number
+    label: string
+  }) => void,
 ) {
   const tiles = listTiles(lat, long, maxRange)
-  await Promise.all(
-    tiles
-      .filter(({ hgtName }) => !splatMod.FS.analyzePath(hgtName, true).exists)
-      .map(async ({ hgtName, sdfName }) => {
-        const response = await fetch(
-          `https://s3.amazonaws.com/elevation-tiles-prod/skadi/${hgtName}`,
-        )
-        await hgtToSdf(
-          splatMod,
-          srtm2sdfMod,
-          hgtName,
-          sdfName,
-          await response.blob(),
-        )
-      }),
-  )
-}
+  let done = 0
+  progressCallback({ value: 0, label: "Downloading tiles..." })
 
-// https://github.com/whatwg/compression/blob/main/explainer.md
-async function hgtToSdf(
-  splatMod: MainModule,
-  srtm2sdfMod: MainModule,
-  hgtName: string,
-  sdfName: string,
-  cBlob: Blob,
-) {
-  const decompressedStream = cBlob
-    .stream()
-    .pipeThrough(new DecompressionStream("gzip"))
-  const dBlob = await new Response(decompressedStream).blob()
-
-  const decompressedHgtName = hgtName.substring(0, hgtName.length - 3)
-  const mountedHgtName = `/fs1/${decompressedHgtName}`
-
+  // Mount the filesystem
   srtm2sdfMod.FS.mkdir("/fs1")
   srtm2sdfMod.FS.mount(
     srtm2sdfMod.PROXYFS,
@@ -154,13 +133,53 @@ async function hgtToSdf(
     "/fs1",
   )
 
-  // TODO: Two things:
-  // 1. `mountedHgtName` contains slashes, e.g. 'N41/N41W120.hgt'
-  // 2. Whatever dBlob.arrayBuffer() is, it FS.writeFile doesn't accept it
-  srtm2sdfMod.FS.writeFile(mountedHgtName, await dBlob.arrayBuffer())
-  console.log(`SRTM file created at ${mountedHgtName}`)
-  srtm2sdfMod.callMain([mountedHgtName]) // <-- Writes back into the root of the (mounted) splat FS
-  console.log(`SDF file created at ${sdfName}`)
-  console.log(splatMod.FS.analyzePath(sdfName, true))
+  // Download and convert all the .hgt.gz -> .sdf
+  await Promise.all(
+    tiles
+      .filter(({ hgtName }) => !splatMod.FS.analyzePath(hgtName, true).exists)
+      .map(async ({ hgtName, shortHgtName, sdfName }) => {
+        const response = await fetch(
+          `https://s3.amazonaws.com/elevation-tiles-prod/skadi/${hgtName}`,
+        )
+        await hgtToSdf(
+          srtm2sdfMod,
+          shortHgtName,
+          sdfName,
+          await response.blob(),
+        )
+        done++
+        progressCallback({
+          value: done / tiles.length,
+          label: "Downloading tiles...",
+        })
+      }),
+  )
+
+  // Check that the expected files exist on the splat FS
+  console.log(srtm2sdfMod.FS.readdir("/fs1"))
+  console.log(splatMod.FS.readdir("/"))
   srtm2sdfMod.FS.unmount("/fs1")
+}
+
+// https://github.com/whatwg/compression/blob/main/explainer.md
+async function hgtToSdf(
+  srtm2sdfMod: MainModule,
+  shortHgtName: string,
+  sdfName: string,
+  cBlob: Blob,
+) {
+  const decompressedStream = cBlob
+    .stream()
+    .pipeThrough(new DecompressionStream("gzip"))
+  const dBlob = await new Response(decompressedStream).blob()
+
+  const decompressedHgtName = shortHgtName.substring(0, shortHgtName.length - 3)
+  const mountedHgtName = `/fs1/${decompressedHgtName}`
+
+  const ab = new Uint8Array(await dBlob.arrayBuffer())
+  srtm2sdfMod.FS.writeFile(mountedHgtName, ab)
+  console.log(`SRTM file created at ${mountedHgtName}`)
+  srtm2sdfMod.callMain([mountedHgtName]) // <-- Writes back into the root of the srtm2sdfMod FS
+  console.log(`SDF file created at ${sdfName}`)
+  srtm2sdfMod.FS.rename(sdfName, `/fs1/${sdfName}`)
 }

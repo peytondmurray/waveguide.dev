@@ -2,6 +2,7 @@ import {
   Button,
   Group,
   NumberInput,
+  Progress,
   Select,
   Stack,
   TextInput,
@@ -9,11 +10,12 @@ import {
 import "./Navbar.css"
 
 import { useAtom } from "jotai"
-import { configAtom } from "./atoms"
+import { configAtom, progressAtom } from "./atoms"
 import type { IConfig } from "./config"
 
 export default function Navbar({ handleRun }: { handleRun: () => void }) {
   const [config, setConfig] = useAtom(configAtom)
+  const [progress, _setProgres] = useAtom(progressAtom)
 
   /**
    * Helper which makes the nested object destructuring a little better when updating the config.
@@ -66,7 +68,7 @@ export default function Navbar({ handleRun }: { handleRun: () => void }) {
   }
 
   return (
-    <div id="navbar">
+    <Stack id="navbar">
       <Stack className="section" gap={0}>
         <h4 className="sectionTitle">Transmitter</h4>
         <TextInput
@@ -265,9 +267,14 @@ export default function Navbar({ handleRun }: { handleRun: () => void }) {
           />
         </Group>
       </Stack>
+      <Progress.Root>
+        <Progress.Section value={progress.value}>
+          <Progress.Label>{progress.label}</Progress.Label>
+        </Progress.Section>
+      </Progress.Root>
       <Stack className="section">
         <Button onClick={handleRun}>Run simulation</Button>
       </Stack>
-    </div>
+    </Stack>
   )
 }
