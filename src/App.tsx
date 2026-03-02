@@ -2,31 +2,37 @@ import { AppShell, Burger, MantineProvider } from "@mantine/core"
 import { useDisclosure } from "@mantine/hooks"
 import { useEffect, useState } from "react"
 import Navbar from "./Navbar"
-import SplatFactory, { type MainModule } from "splat-web"
+import Splat, {type MainModule} from "splat-web/splat"
+import Srtm2sdf from "splat-web/srtm2sdf"
 import Map from "./Map"
-import { downloadTiles, getTiles } from "./util"
+import { downloadTiles } from "./util"
 
 import "@mantine/core/styles.css"
 
 import "./App.css"
 import { useAtom } from "jotai"
 import { configAtom } from "./atoms"
-import type { IConfig } from "./config"
 
 export default function App() {
   const [splatModule, setSplatModule] = useState<MainModule | null>(null)
+  const [srtm2sdfModule, setSrtm2sdfModule] = useState<MainModule | null>(null)
+
   useEffect(() => {
-    SplatFactory({ noInitialRun: true }).then((mod) => setSplatModule(mod))
+    Splat({ noInitialRun: true }).then((mod) => setSplatModule(mod))
+    Srtm2sdf({ noInitialRun: true }).then((mod) => setSrtm2sdfModule(mod))
   }, [])
 
   const [config, _setConfig] = useAtom(configAtom)
   const [opened, { toggle }] = useDisclosure()
 
   async function handleRun() {
-    if (splatModule !== null) {
-
+    if (splatModule !== null && srtm2sdfModule !== null) {
+      // await loadTiles(
+      //   splatModule,
+      // )
       await downloadTiles(
         splatModule,
+        srtm2sdfModule,
         config.transmitter.latitude,
         config.transmitter.longitude,
         config.simulationOptions.maxRange,
