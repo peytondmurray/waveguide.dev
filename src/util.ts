@@ -1,4 +1,4 @@
-import { type MainModule } from "splat-web/splat"
+import type { MainModule } from "splat-web/splat"
 
 type Tile = {
   latMin: number
@@ -17,7 +17,7 @@ type Tile = {
  * @returns Radians
  */
 function degToRad(deg: number): number {
-  return deg*Math.PI/180
+  return (deg * Math.PI) / 180
 }
 
 /**
@@ -27,7 +27,7 @@ function degToRad(deg: number): number {
  * @returns Degrees
  */
 function radToDeg(rad: number): number {
-  return rad*180/Math.PI
+  return (rad * 180) / Math.PI
 }
 
 /**
@@ -46,32 +46,38 @@ function listTiles(lat: number, long: number, maxRange: number): Tile[] {
   const rEarth = 6378137
 
   const dphi = radToDeg(maxRange / rEarth)
-  const dtheta = radToDeg(2*Math.asin(Math.sin(maxRange / (2* rEarth)) / Math.cos(degToRad(lat))))
+  const dtheta = radToDeg(
+    2 * Math.asin(Math.sin(maxRange / (2 * rEarth)) / Math.cos(degToRad(lat))),
+  )
 
   const latitudeBounds = [Math.floor(lat - dphi), Math.ceil(lat + dphi)]
   const longitudeBounds = [Math.floor(long - dtheta), Math.ceil(long + dtheta)]
 
-  let tiles: Tile[] = []
-  for (let phi = latitudeBounds[0]; phi<latitudeBounds[1]+1; phi++) {
-    for (let lambda = longitudeBounds[0]; lambda<longitudeBounds[1]+1; lambda++) {
+  const tiles: Tile[] = []
+  for (let phi = latitudeBounds[0]; phi < latitudeBounds[1] + 1; phi++) {
+    for (
+      let lambda = longitudeBounds[0];
+      lambda < longitudeBounds[1] + 1;
+      lambda++
+    ) {
       const ns = phi >= 0 ? "N" : "S"
       const ew = lambda >= 0 ? "E" : "W"
 
       // SDF files clamp the longitude to the interval (-180, 180) rather than using E/W
       const longMin = lambda < 0 ? 360 - lambda : lambda
-      const longMax = longMin == 359 ? 0 : longMin + 1
+      const longMax = longMin === 359 ? 0 : longMin + 1
 
       const absPhi = Math.abs(phi).toFixed(0)
       const absLambda = Math.abs(lambda).toFixed(0)
 
       tiles.push({
         latMin: phi,
-        latMax: phi+1,
+        latMax: phi + 1,
         longMin,
         longMax,
         hgtName: `${ns}${absPhi}/${ns}${absPhi}${ew}${absLambda}.hgt.gz`,
-        sdfName: `${phi}:${phi+1}:${longMin}:${longMax}.sdf`,
-        sdfHDName: `${phi}:${phi+1}:${longMin}:${longMax}-hd.sdf`,
+        sdfName: `${phi}:${phi + 1}:${longMin}:${longMax}.sdf`,
+        sdfHDName: `${phi}:${phi + 1}:${longMin}:${longMax}-hd.sdf`,
       })
     }
   }
@@ -106,14 +112,19 @@ export async function downloadTiles(
   const tiles = listTiles(lat, long, maxRange)
   await Promise.all(
     tiles
-      .filter(({hgtName}) => !splatMod.FS.analyzePath(hgtName, true).exists)
-      .map(async ({hgtName, sdfName}) => {
+      .filter(({ hgtName }) => !splatMod.FS.analyzePath(hgtName, true).exists)
+      .map(async ({ hgtName, sdfName }) => {
         const response = await fetch(
-          `https://s3.amazonaws.com/elevation-tiles-prod/skadi/${hgtName}`
+          `https://s3.amazonaws.com/elevation-tiles-prod/skadi/${hgtName}`,
         )
-        await hgtToSdf(splatMod, srtm2sdfMod, hgtName, sdfName, await response.blob())
-
-      })
+        await hgtToSdf(
+          splatMod,
+          srtm2sdfMod,
+          hgtName,
+          sdfName,
+          await response.blob(),
+        )
+      }),
   )
 }
 
@@ -127,28 +138,29 @@ async function hgtToSdf(
 ) {
   const decompressedStream = cBlob
     .stream()
-    .pipeThrough(new DecompressionStream('gzip'))
+    .pipeThrough(new DecompressionStream("gzip"))
   const dBlob = await new Response(decompressedStream).blob()
 
   const decompressedHgtName = hgtName.substring(0, hgtName.length - 3)
   const mountedHgtName = `/fs1/${decompressedHgtName}`
 
-  srtm2sdfMod.FS.mkdir("/fs1");
-  srtm2sdfMod.FS.mount(srtm2sdfMod.PROXYFS, {
+  srtm2sdfMod.FS.mkdir("/fs1")
+  srtm2sdfMod.FS.mount(
+    srtm2sdfMod.PROXYFS,
+    {
       root: "/",
-      fs: splatMod.FS
-  }, "/fs1");
+      fs: splatMod.FS,
+    },
+    "/fs1",
+  )
 
   // TODO: Two things:
   // 1. `mountedHgtName` contains slashes, e.g. 'N41/N41W120.hgt'
   // 2. Whatever dBlob.arrayBuffer() is, it FS.writeFile doesn't accept it
-  srtm2sdfMod.FS.writeFile(
-    mountedHgtName,
-    await dBlob.arrayBuffer()
-  )
+  srtm2sdfMod.FS.writeFile(mountedHgtName, await dBlob.arrayBuffer())
   console.log(`SRTM file created at ${mountedHgtName}`)
   srtm2sdfMod.callMain([mountedHgtName]) // <-- Writes back into the root of the (mounted) splat FS
   console.log(`SDF file created at ${sdfName}`)
   console.log(splatMod.FS.analyzePath(sdfName, true))
-  srtm2sdfMod.FS.unmount('/fs1')
+  srtm2sdfMod.FS.unmount("/fs1")
 }

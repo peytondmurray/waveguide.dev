@@ -15,7 +15,14 @@ interface IConfig {
     cableLoss: number
   }
   environment: {
-    radioClimate: "equatorial" | "continental subtropical"| "maritime subtropical"| "desert"| "continental temperate"| "maritime temperate (land)"| "maritime temperate (sea)"
+    radioClimate:
+      | "equatorial"
+      | "continental subtropical"
+      | "maritime subtropical"
+      | "desert"
+      | "continental temperate"
+      | "maritime temperate (land)"
+      | "maritime temperate (sea)"
     polarization: "horizontal" | "vertical"
     clutterHeight: number
     groundDielectric: number
@@ -69,7 +76,7 @@ const DefaultConfig: IConfig = {
     maximumSignal: -80,
     colormap: "plasma",
     transparency: 50,
-  }
+  },
 }
 
 export { type IConfig, DefaultConfig }

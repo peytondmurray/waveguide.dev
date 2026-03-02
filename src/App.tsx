@@ -1,10 +1,10 @@
 import { AppShell, Burger, MantineProvider } from "@mantine/core"
 import { useDisclosure } from "@mantine/hooks"
 import { useEffect, useState } from "react"
-import Navbar from "./Navbar"
-import Splat, {type MainModule} from "splat-web/splat"
+import Splat, { type MainModule } from "splat-web/splat"
 import Srtm2sdf from "splat-web/srtm2sdf"
-import Map from "./Map"
+import MapWidget from "./MapWidget"
+import Navbar from "./Navbar"
 import { downloadTiles } from "./util"
 
 import "@mantine/core/styles.css"
@@ -56,7 +56,7 @@ export default function App() {
         "-db",
         config.display.minimumSignal,
         "-kml",
-        "-olditm"
+        "-olditm",
       ])
     }
   }
@@ -81,11 +81,15 @@ export default function App() {
         </AppShell.Header>
 
         <AppShell.Navbar>
-          {splatModule === null ? <p>Loading...</p> : <Navbar handleRun={handleRun} />}
+          {splatModule === null ? (
+            <p>Loading...</p>
+          ) : (
+            <Navbar handleRun={handleRun} />
+          )}
         </AppShell.Navbar>
 
         <AppShell.Main>
-          <Map />
+          <MapWidget />
         </AppShell.Main>
       </AppShell>
     </MantineProvider>
