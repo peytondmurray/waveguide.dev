@@ -1,4 +1,5 @@
 import type { MainModule } from "splat-web/splat"
+import { toScaledStringArray } from "./colormaps"
 import type { IConfig } from "./config"
 
 type Tile = {
@@ -288,7 +289,7 @@ export async function generateSplatInputs(mod: MainModule, config: IConfig) {
   await awaitableSyncfs(mod, true)
 
   mod.FS.writeFile(
-    "/idbfs/tx.qth",
+    "tx.qth",
     [
       "tx",
       config.transmitter.latitude.toFixed(6),
@@ -307,22 +308,42 @@ export async function generateSplatInputs(mod: MainModule, config: IConfig) {
     throw new Error("Undefined value for polarization")
   }
 
-  mod.FS.writeFile("/idbfs/splat.lrp", [
-    config.environment.groundDielectric.toFixed(3),
-    config.environment.groundConductivity.toFixed(6),
-    config.environment.atmosphericBending.toFixed(3),
-    config.transmitter.frequency.toFixed(3),
-    climate.toString(),
-    polarization.toString(),
-    (config.simulationOptions.simulationFraction / 100).toFixed(2),
-    (config.simulationOptions.timeFraction / 100).toFixed(2),
-    calculateErpWatts(
-      config.transmitter.power,
-      config.transmitter.antennaGain,
-      config.receiver.cableLoss,
-    ).toFixed(2),
-  ])
+  mod.FS.writeFile(
+    "splat.lrp",
+    [
+      config.environment.groundDielectric.toFixed(3),
+      config.environment.groundConductivity.toFixed(6),
+      config.environment.atmosphericBending.toFixed(3),
+      config.transmitter.frequency.toFixed(3),
+      climate.toString(),
+      polarization.toString(),
+      (config.simulationOptions.simulationFraction / 100).toFixed(2),
+      (config.simulationOptions.timeFraction / 100).toFixed(2),
+      calculateErpWatts(
+        config.transmitter.power,
+        config.transmitter.antennaGain,
+        config.receiver.cableLoss,
+      ).toFixed(2),
+      "",
+    ].join("\n"),
+  )
 
+  const ssa = [
+    "; SPLAT! Auto-generated DBM Signal Level Color Definition",
+    ";",
+    "; Format: dBm: red, green, blue",
+    ";",
+  ]
+    .concat(
+      toScaledStringArray(
+        config.display.colormap,
+        config.display.minimumSignal,
+        config.display.maximumSignal,
+      ),
+    )
+    .concat("")
+
+  mod.FS.writeFile("splat.dcf", ssa.join("\n"))
   await awaitableSyncfs(mod, false)
 }
 
