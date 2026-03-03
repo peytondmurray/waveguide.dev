@@ -17,12 +17,12 @@ type Tile = {
 
 const radioClimateMap = new Map([
   ["equatorial", 1],
-  ["continental_subtropical", 2],
-  ["maritime_subtropical", 3],
+  ["continental subtropical", 2],
+  ["maritime subtropical", 3],
   ["desert", 4],
-  ["continental_temperate", 5],
-  ["maritime_temperate_land", 6],
-  ["maritime_temperate_sea", 7],
+  ["continental temperate", 5],
+  ["maritime temperate (land)", 6],
+  ["maritime temperate (sea)", 7],
 ])
 
 const polarizationMap = new Map([
@@ -247,7 +247,7 @@ async function hgtToSdf(
   mod.FS.writeFile(`/idbfs/${sdfName}`, content)
 }
 
-export async function runSplat(mod: MainModule, _config: IConfig) {
+export async function runSplat(mod: MainModule, config: IConfig) {
   // Mount the IDBFS filesystem to persist the tiles; sync the IDBFS to the emscripten filesystem
   // If this directory already exists, no need to remake it
   if (!mod.FS.analyzePath("/idbfs", true).exists) {
@@ -256,38 +256,62 @@ export async function runSplat(mod: MainModule, _config: IConfig) {
   mod.FS.mount(mod.IDBFS, {}, "/idbfs")
   await awaitableSyncfs(mod, true)
 
-  // mod.callMain([
-  //   "-t",
-  //   "tx.qth",
-  //   "-L",
-  //   config.receiver.heightAGL.toString(),
-  //   "-metric",
-  //   (config.simulationOptions.maxRange / 1000).toString(),
-  //   "-sc",
-  //   "-gc",
-  //   config.environment.clutterHeight.toString(),
-  //   "-ngs",
-  //   "-N",
-  //   "-o",
-  //   "output.ppm",
-  //   "-dbm",
-  //   "-db",
-  //   config.display.minimumSignal.toString(),
-  //   "-kml",
-  //   "-olditm",
-  // ])
-  //
+  mod.callMain([
+    // txsite.qth
+    "-t",
+    "tx.qth",
+
+    // plot path loss map of TX based on an RX at X feet/meters AGL
+    "-L",
+    config.receiver.heightAGL.toString(),
+
+    // employ metric rather than imperial units for all user I/O
+    "-metric",
+
+    // modify default range for -c or -L (miles/kilometers)
+    "-R",
+    (config.simulationOptions.maxRange / 1000).toString(),
+
+    // display smooth rather than quantized contour levels
+    "-sc",
+
+    // ground clutter height (feet/meters)
+    "-gc",
+    config.environment.clutterHeight.toString(),
+
+    // display greyscale topography as white in .ppm files
+    "-ngs",
+
+    // do not produce unnecessary site or obstruction reports
+    "-N",
+
+    // filename of topographic map to generate (.ppm)
+    "-o",
+    "output.ppm",
+
+    // plot signal power level contours rather than field strength
+    "-dbm",
+
+    // threshold beyond which contours will not be displayed
+    "-db",
+    config.display.minimumSignal.toString(),
+
+    // generate Google Earth (.kml) compatible output
+    "-kml",
+
+    // invoke Longley-Rice rather than the default ITWOM model
+    "-olditm",
+
+    // sdf file directory path (overrides path in ~/.splat_path file)
+    "-d",
+    "/idbfs/",
+  ])
+
   console.log(mod.FS.readdir("/idbfs"))
   console.log(mod.FS.readdir("/"))
 }
 
 export async function generateSplatInputs(mod: MainModule, config: IConfig) {
-  if (!mod.FS.analyzePath("/idbfs", true).exists) {
-    mod.FS.mkdir("/idbfs")
-  }
-  mod.FS.mount(mod.IDBFS, {}, "/idbfs")
-  await awaitableSyncfs(mod, true)
-
   mod.FS.writeFile(
     "tx.qth",
     [
@@ -353,4 +377,24 @@ function calculateErpWatts(
   systemLoss: number,
 ): number {
   return 10 ** ((txPower + txGain - systemLoss - 30) / 10)
+}
+
+export function getKmlBounds(mod: MainModule): {
+  north: number
+  south: number
+  east: number
+  west: number
+} {
+  const doc = new DOMParser().parseFromString(
+    mod.FS.readFile("output.kml", { encoding: "utf8" }) as unknown as string,
+    "text/xml",
+  )
+
+  console.log({ doc })
+  return {
+    north: 0,
+    south: 0,
+    east: 0,
+    west: 0,
+  }
 }

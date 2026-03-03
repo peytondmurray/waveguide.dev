@@ -179,17 +179,44 @@ const cm = new Map([
 
 export type colormap = "viridis" | "plasma" | "magma" | "cividis" | "inferno"
 
-function padNumber(n: number, l: number) {
+/**
+ * Render a number as a string, left padded with zeroes.
+ *
+ * @param n - Number to pad
+ * @param l - Number of digits to left-pad to
+ * @returns The left-padded number, as a string
+ */
+function padNumber(n: number, l: number): string {
   return `${n}`.padStart(l, "0")
 }
 
-function formatPM(n: number, l: number) {
+/**
+ * Format a number, left padded with zeroes and including a sign (even for positive numbers).
+ *
+ * @param n - Number to display
+ * @param l - Number of digits to left-pad to
+ * @returns The left-padded number string, with the sign included
+ */
+function formatPM(n: number, l: number): string {
   if (n >= 0) {
     return `+${padNumber(n, l)}`
   }
   return `-${padNumber(-1 * n, l)}`
 }
 
+/**
+ * Get the requested colormap as an array of strings, with numbers scaled to the range [min, max]
+ *
+ * @param cmName - Name of the colormap
+ * @param min - Value associated with the minimum value of the colormap
+ * @param max - Value associated with the maximum value of the colormap
+ * @returns An array of strings of the format
+ *  [
+ *    "min: R_min, G_min, B_min",
+ *    ...
+ *    "max: R_max, G_max, B_max"
+ *  ]
+ */
 export function toScaledStringArray(
   cmName: colormap,
   min: number,
