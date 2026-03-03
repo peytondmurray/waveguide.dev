@@ -30,8 +30,8 @@ importers:
         specifier: ^5.0.0
         version: 5.0.0(leaflet@1.9.4)(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
       splat-web:
-        specifier: ^0.0.5
-        version: 0.0.5
+        specifier: ^0.0.6
+        version: 0.0.6
     devDependencies:
       '@eslint/js':
         specifier: ^9.39.3
@@ -1145,8 +1145,8 @@ packages:
     resolution: {integrity: sha512-UXWMKhLOwVKb728IUtQPXxfYU+usdybtUrK/8uGE8CQMvrhOpwvzDBwj0QhSL7MQc7vIsISBG8VQ8+IDQxpfQA==}
     engines: {node: '>=0.10.0'}
 
-  splat-web@0.0.5:
-    resolution: {integrity: sha512-hAOMmSxiEW0CZDHTT79aHAV2/Ia+hEzmNlxpL/+Cl7mhKJD61GEfxpKcB9mwmGIwl4FIZtEZFv0cfzPrVAdOYA==}
+  splat-web@0.0.6:
+    resolution: {integrity: sha512-lnncRF1zZ9RVa+9d8Aqa7B9ikpz7Sl5nqyuSYiL5CLvkGZGlewyLQoyj+AT4NicdQXs7MXKz7FXzVkezgBC67A==}
 
   strip-json-comments@3.1.1:
     resolution: {integrity: sha512-6fPc+R4ihwqP6N/aIv2f1gMH8lOVtWQHoqC4yK6oSDVVocumAsfCqjkXnqiYMhmMwS/mEHLp7Vehlt3ql6lEig==}
@@ -2320,7 +2320,7 @@ snapshots:
 
   source-map-js@1.2.1: {}
 
-  splat-web@0.0.5: {}
+  splat-web@0.0.6: {}
 
   strip-json-comments@3.1.1: {}
 

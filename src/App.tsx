@@ -5,7 +5,7 @@ import Splat, { type MainModule } from "splat-web/splat"
 import Srtm2sdf from "splat-web/srtm2sdf"
 import MapWidget from "./MapWidget"
 import Navbar from "./Navbar"
-import { downloadTiles } from "./util"
+import { downloadTiles, runSplat } from "./util"
 
 import "@mantine/core/styles.css"
 
@@ -29,7 +29,6 @@ export default function App() {
   async function handleRun() {
     if (splatModule !== null && srtm2sdfModule !== null) {
       await downloadTiles(
-        splatModule,
         srtm2sdfModule,
         config.transmitter.latitude,
         config.transmitter.longitude,
@@ -37,26 +36,7 @@ export default function App() {
         setProgress,
       )
 
-      splatModule.callMain([
-        "-t",
-        "tx.qth",
-        "-L",
-        config.receiver.heightAGL,
-        "-metric",
-        config.simulationOptions.maxRange / 1000,
-        "-sc",
-        "-gc",
-        config.environment.clutterHeight,
-        "-ngs",
-        "-N",
-        "-o",
-        "output.ppm",
-        "-dbm",
-        "-db",
-        config.display.minimumSignal,
-        "-kml",
-        "-olditm",
-      ])
+      await runSplat(splatModule, config)
     }
   }
 

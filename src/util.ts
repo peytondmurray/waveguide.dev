@@ -1,10 +1,13 @@
 import type { MainModule } from "splat-web/splat"
+import type { IConfig } from './config'
 
 type Tile = {
   latMin: number
   latMax: number
   longMin: number
   longMax: number
+  phi: number
+  lambda: number
   shortHgtName: string
   hgtName: string
   sdfName: string
@@ -64,9 +67,10 @@ function listTiles(lat: number, long: number, maxRange: number): Tile[] {
       const ns = phi >= 0 ? "N" : "S"
       const ew = lambda >= 0 ? "E" : "W"
 
-      // SDF files clamp the longitude to the interval (-180, 180) rather than using E/W
-      const longMin = lambda < 0 ? 360 - lambda : lambda
-      const longMax = longMin === 359 ? 0 : longMin + 1
+      // For whatever reason, SDF uses a coordinate system which increases towards the West rather
+      // than the East, i.e. it increases in the direction of -lambda.
+      const longMin = clamp0to360(360 - lambda) - 1 // srtm2sdf treats lambda as upper bound
+      const longMax = longMin == 359 ? 0 : longMin + 1
 
       const absPhi = Math.abs(phi).toFixed(0)
       const absLambda = Math.abs(lambda).toFixed(0)
@@ -74,6 +78,8 @@ function listTiles(lat: number, long: number, maxRange: number): Tile[] {
       tiles.push({
         latMin: phi,
         latMax: phi + 1,
+        phi,
+        lambda,
         longMin,
         longMax,
         shortHgtName: `${ns}${absPhi}${ew}${absLambda}.hgt.gz`,
@@ -84,7 +90,32 @@ function listTiles(lat: number, long: number, maxRange: number): Tile[] {
     }
   }
 
+  console.log({tiles})
+
   return tiles
+}
+
+function clamp0to360(a: number): number {
+  if (a > 360) {
+    return clamp0to360(a - 360)
+  } else if (a < 0) {
+    return clamp0to360(a + 360)
+  } else {
+    return a
+  }
+}
+
+// https://github.com/emscripten-core/emscripten/issues/18306#issuecomment-1502710013
+async function awaitableSyncfs(mod: MainModule, b: boolean): Promise<void> {
+  return new Promise((resolve, reject) => {
+    mod.FS.syncfs(b, (err: Error) => {
+      if (err) {
+        reject(err)
+      } else {
+        resolve()
+      }
+    })
+  })
 }
 
 /**
@@ -105,8 +136,7 @@ function listTiles(lat: number, long: number, maxRange: number): Tile[] {
  * @param maxRange - Radius [m] around (lat, long) to include tiles from
  */
 export async function downloadTiles(
-  splatMod: MainModule,
-  srtm2sdfMod: MainModule,
+  mod: MainModule,
   lat: number,
   long: number,
   maxRange: number,
@@ -122,27 +152,37 @@ export async function downloadTiles(
   let done = 0
   progressCallback({ value: 0, label: "Downloading tiles..." })
 
-  // Mount the filesystem
-  srtm2sdfMod.FS.mkdir("/fs1")
-  srtm2sdfMod.FS.mount(
-    srtm2sdfMod.PROXYFS,
-    {
-      root: "/",
-      fs: splatMod.FS,
-    },
-    "/fs1",
-  )
+  // Mount the IDBFS filesystem to persist the tiles; sync the IDBFS to the emscripten filesystem
+  // If this directory already exists, no need to remake it
+  if (!mod.FS.analyzePath("/idbfs", true).exists) {
+    mod.FS.mkdir("/idbfs")
+  }
+  mod.FS.mount(mod.IDBFS, {}, "/idbfs")
+  await awaitableSyncfs(mod, true)
 
-  // Download and convert all the .hgt.gz -> .sdf
+  // Download and convert all the .hgt.gz -> .sdf. Persist .hgt so that downloads only need to
+  // happen as needed
   await Promise.all(
     tiles
-      .filter(({ hgtName }) => !splatMod.FS.analyzePath(hgtName, true).exists)
+      .filter(({ sdfName }) => !mod.FS.analyzePath(`/idbfs/${sdfName}`, true).exists)
       .map(async ({ hgtName, shortHgtName, sdfName }) => {
-        const response = await fetch(
-          `https://s3.amazonaws.com/elevation-tiles-prod/skadi/${hgtName}`,
-        )
+        let response
+
+        if (mod.FS.analyzePath(`/${shortHgtName}`, true).exists) {
+          // If the .hgt.gz exists in the filesystem already, read it as a blob
+
+          const contents = mod.FS.readFile(`/idbfs/${shortHgtName}`, { encoding: 'binary' })
+          const blob = new Blob([contents])
+          response = new Response(blob)
+        } else {
+          // Otherwise fetch it from AWS
+
+          response = await fetch(
+            `https://s3.amazonaws.com/elevation-tiles-prod/skadi/${hgtName}`,
+          )
+        }
         await hgtToSdf(
-          srtm2sdfMod,
+          mod,
           shortHgtName,
           sdfName,
           await response.blob(),
@@ -155,15 +195,14 @@ export async function downloadTiles(
       }),
   )
 
-  // Check that the expected files exist on the splat FS
-  console.log(srtm2sdfMod.FS.readdir("/fs1"))
-  console.log(splatMod.FS.readdir("/"))
-  srtm2sdfMod.FS.unmount("/fs1")
+  await awaitableSyncfs(mod, false)
+  console.log(mod.FS.readdir("/idbfs"))
+  mod.FS.unmount("/idbfs")
 }
 
 // https://github.com/whatwg/compression/blob/main/explainer.md
 async function hgtToSdf(
-  srtm2sdfMod: MainModule,
+  mod: MainModule,
   shortHgtName: string,
   sdfName: string,
   cBlob: Blob,
@@ -174,12 +213,50 @@ async function hgtToSdf(
   const dBlob = await new Response(decompressedStream).blob()
 
   const decompressedHgtName = shortHgtName.substring(0, shortHgtName.length - 3)
-  const mountedHgtName = `/fs1/${decompressedHgtName}`
+  const mountedHgtName = `/idbfs/${decompressedHgtName}`
 
   const ab = new Uint8Array(await dBlob.arrayBuffer())
-  srtm2sdfMod.FS.writeFile(mountedHgtName, ab)
-  console.log(`SRTM file created at ${mountedHgtName}`)
-  srtm2sdfMod.callMain([mountedHgtName]) // <-- Writes back into the root of the srtm2sdfMod FS
-  console.log(`SDF file created at ${sdfName}`)
-  srtm2sdfMod.FS.rename(sdfName, `/fs1/${sdfName}`)
+  mod.FS.writeFile(mountedHgtName, ab)
+  mod.callMain([mountedHgtName]) // <-- Writes back into the root of the srtm2sdfMod FS
+
+  // Can't just rename between filesystems - need to copy the file contents instead
+  const content = mod.FS.readFile(sdfName, {encoding: 'binary'})
+  mod.FS.writeFile(`/idbfs/${sdfName}`, content)
+}
+
+export async function runSplat(
+  mod: MainModule,
+  config: IConfig,
+) {
+  // Mount the IDBFS filesystem to persist the tiles; sync the IDBFS to the emscripten filesystem
+  // If this directory already exists, no need to remake it
+  if (!mod.FS.analyzePath("/idbfs", true).exists) {
+    mod.FS.mkdir("/idbfs")
+  }
+  mod.FS.mount(mod.IDBFS, {}, "/idbfs")
+  await awaitableSyncfs(mod, true)
+
+  // mod.callMain([
+  //   "-t",
+  //   "tx.qth",
+  //   "-L",
+  //   config.receiver.heightAGL.toString(),
+  //   "-metric",
+  //   (config.simulationOptions.maxRange / 1000).toString(),
+  //   "-sc",
+  //   "-gc",
+  //   config.environment.clutterHeight.toString(),
+  //   "-ngs",
+  //   "-N",
+  //   "-o",
+  //   "output.ppm",
+  //   "-dbm",
+  //   "-db",
+  //   config.display.minimumSignal.toString(),
+  //   "-kml",
+  //   "-olditm",
+  // ])
+  //
+  console.log(mod.FS.readdir("/idbfs"))
+  console.log(mod.FS.readdir('/'))
 }
