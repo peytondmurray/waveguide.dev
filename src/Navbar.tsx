@@ -170,7 +170,7 @@ export default function Navbar({ handleRun }: { handleRun: () => void }) {
         />
         <Select
           label="Polarization"
-          data={makeLabeledValues(["Vertical", "Horizontal"])}
+          data={makeLabeledValues(["Horizontal", "Vertical"])}
           value={config.environment.polarization}
           onChange={(value) => {
             if (value !== null) {

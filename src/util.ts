@@ -1,5 +1,5 @@
 import type { MainModule } from "splat-web/splat"
-import type { IConfig } from './config'
+import type { IConfig } from "./config"
 
 type Tile = {
   latMin: number
@@ -13,6 +13,21 @@ type Tile = {
   sdfName: string
   sdfHDName: string
 }
+
+const radioClimateMap = new Map([
+  ["equatorial", 1],
+  ["continental_subtropical", 2],
+  ["maritime_subtropical", 3],
+  ["desert", 4],
+  ["continental_temperate", 5],
+  ["maritime_temperate_land", 6],
+  ["maritime_temperate_sea", 7],
+])
+
+const polarizationMap = new Map([
+  ["horizontal", 1],
+  ["vertical", 2],
+])
 
 /**
  * Convert degrees to radians.
@@ -70,7 +85,7 @@ function listTiles(lat: number, long: number, maxRange: number): Tile[] {
       // For whatever reason, SDF uses a coordinate system which increases towards the West rather
       // than the East, i.e. it increases in the direction of -lambda.
       const longMin = clamp0to360(360 - lambda) - 1 // srtm2sdf treats lambda as upper bound
-      const longMax = longMin == 359 ? 0 : longMin + 1
+      const longMax = longMin === 359 ? 0 : longMin + 1
 
       const absPhi = Math.abs(phi).toFixed(0)
       const absLambda = Math.abs(lambda).toFixed(0)
@@ -90,7 +105,7 @@ function listTiles(lat: number, long: number, maxRange: number): Tile[] {
     }
   }
 
-  console.log({tiles})
+  console.log({ tiles })
 
   return tiles
 }
@@ -105,7 +120,15 @@ function clamp0to360(a: number): number {
   }
 }
 
-// https://github.com/emscripten-core/emscripten/issues/18306#issuecomment-1502710013
+/**
+ * A version of FS.syncfs that you can await.
+ *
+ * See https://github.com/emscripten-core/emscripten/issues/18306#issuecomment-1502710013
+ *
+ * @param mod - Emscripten module whose filesystem is to be synced
+ * @param b - If true, sync from IDBFS to MEMFS. If false, write MEMFS to IDBFS
+ * @returns A promise that resolves when syncing is done
+ */
 async function awaitableSyncfs(mod: MainModule, b: boolean): Promise<void> {
   return new Promise((resolve, reject) => {
     mod.FS.syncfs(b, (err: Error) => {
@@ -164,14 +187,18 @@ export async function downloadTiles(
   // happen as needed
   await Promise.all(
     tiles
-      .filter(({ sdfName }) => !mod.FS.analyzePath(`/idbfs/${sdfName}`, true).exists)
+      .filter(
+        ({ sdfName }) => !mod.FS.analyzePath(`/idbfs/${sdfName}`, true).exists,
+      )
       .map(async ({ hgtName, shortHgtName, sdfName }) => {
-        let response
+        let response: Response
 
         if (mod.FS.analyzePath(`/${shortHgtName}`, true).exists) {
           // If the .hgt.gz exists in the filesystem already, read it as a blob
 
-          const contents = mod.FS.readFile(`/idbfs/${shortHgtName}`, { encoding: 'binary' })
+          const contents = mod.FS.readFile(`/idbfs/${shortHgtName}`, {
+            encoding: "binary",
+          })
           const blob = new Blob([contents])
           response = new Response(blob)
         } else {
@@ -181,12 +208,7 @@ export async function downloadTiles(
             `https://s3.amazonaws.com/elevation-tiles-prod/skadi/${hgtName}`,
           )
         }
-        await hgtToSdf(
-          mod,
-          shortHgtName,
-          sdfName,
-          await response.blob(),
-        )
+        await hgtToSdf(mod, shortHgtName, sdfName, await response.blob())
         done++
         progressCallback({
           value: done / tiles.length,
@@ -220,14 +242,11 @@ async function hgtToSdf(
   mod.callMain([mountedHgtName]) // <-- Writes back into the root of the srtm2sdfMod FS
 
   // Can't just rename between filesystems - need to copy the file contents instead
-  const content = mod.FS.readFile(sdfName, {encoding: 'binary'})
+  const content = mod.FS.readFile(sdfName, { encoding: "binary" })
   mod.FS.writeFile(`/idbfs/${sdfName}`, content)
 }
 
-export async function runSplat(
-  mod: MainModule,
-  config: IConfig,
-) {
+export async function runSplat(mod: MainModule, _config: IConfig) {
   // Mount the IDBFS filesystem to persist the tiles; sync the IDBFS to the emscripten filesystem
   // If this directory already exists, no need to remake it
   if (!mod.FS.analyzePath("/idbfs", true).exists) {
@@ -258,5 +277,59 @@ export async function runSplat(
   // ])
   //
   console.log(mod.FS.readdir("/idbfs"))
-  console.log(mod.FS.readdir('/'))
+  console.log(mod.FS.readdir("/"))
+}
+
+export async function generateSplatInputs(mod: MainModule, config: IConfig) {
+  if (!mod.FS.analyzePath("/idbfs", true).exists) {
+    mod.FS.mkdir("/idbfs")
+  }
+  mod.FS.mount(mod.IDBFS, {}, "/idbfs")
+  await awaitableSyncfs(mod, true)
+
+  mod.FS.writeFile(
+    "/idbfs/tx.qth",
+    [
+      "tx",
+      config.transmitter.latitude.toFixed(6),
+      (360 - config.transmitter.longitude).toFixed(6),
+      config.transmitter.heightAGL.toFixed(2),
+      "",
+    ].join("\n"),
+  )
+
+  const climate = radioClimateMap.get(config.environment.radioClimate)
+  if (climate === undefined) {
+    throw new Error("Undefined value for radio climate")
+  }
+  const polarization = polarizationMap.get(config.environment.polarization)
+  if (polarization === undefined) {
+    throw new Error("Undefined value for polarization")
+  }
+
+  mod.FS.writeFile("/idbfs/splat.lrp", [
+    config.environment.groundDielectric.toFixed(3),
+    config.environment.groundConductivity.toFixed(6),
+    config.environment.atmosphericBending.toFixed(3),
+    config.transmitter.frequency.toFixed(3),
+    climate.toString(),
+    polarization.toString(),
+    (config.simulationOptions.simulationFraction / 100).toFixed(2),
+    (config.simulationOptions.timeFraction / 100).toFixed(2),
+    calculateErpWatts(
+      config.transmitter.power,
+      config.transmitter.antennaGain,
+      config.receiver.cableLoss,
+    ).toFixed(2),
+  ])
+
+  await awaitableSyncfs(mod, false)
+}
+
+function calculateErpWatts(
+  txPower: number,
+  txGain: number,
+  systemLoss: number,
+): number {
+  return 10 ** ((txPower + txGain - systemLoss - 30) / 10)
 }
