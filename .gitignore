@@ -28,3 +28,4 @@ pnpm-workspace.yaml
 
 # Local Netlify folder
 .netlify
+public/

@@ -1,15 +1,10 @@
+import { BlobReader, type FileEntry, ZipReader } from "@zip.js/zip.js"
 import type { MainModule } from "splat-web/splat"
 import { toScaledStringArray } from "./colormaps"
 import type { IConfig } from "./config"
 import type { Bounds } from "./result"
 
 type Tile = {
-  latMin: number
-  latMax: number
-  longMin: number
-  longMax: number
-  phi: number
-  lambda: number
   filename: string
   url: string
   sdfName: string
@@ -103,16 +98,11 @@ function listTiles(
         url = `https://s3.amazonaws.com/elevation-tiles-prod/skadi/${ns}${absPhi}/${filename}`
       } else {
         filename = `${ns}${absPhi}${ew}${absLambda}.SRTMGL3S.hgt.zip`
-        url = `https://srtm.fasma.org/${filename}`
+        // url = `https://srtm.fasma.org/${filename}`
+        url = `http://localhost:5173/${filename}`
       }
 
       tiles.push({
-        latMin: phi,
-        latMax: phi + 1,
-        phi,
-        lambda,
-        longMin,
-        longMax,
         filename,
         url,
         sdfName: `${phi}:${phi + 1}:${longMin}:${longMax}.sdf`,
@@ -248,6 +238,38 @@ export async function downloadTiles(
   mod.FS.unmount("/idbfs")
 }
 
+async function ungz(blob: Blob): Promise<Uint8Array> {
+  const decompressedStream = blob
+    .stream()
+    .pipeThrough(new DecompressionStream("gzip"))
+  const dBlob = await new Response(decompressedStream).blob()
+
+  return new Uint8Array(await dBlob.arrayBuffer())
+}
+
+async function unzip(blob: Blob): Promise<Uint8Array> {
+  // https://github.com/gildas-lormeau/zip.js
+  const zipFileReader = new BlobReader(blob)
+
+  const zipReader = new ZipReader(zipFileReader)
+  const firstEntry = (await zipReader.getEntries()).shift()
+  if (firstEntry === undefined) {
+    return new Uint8Array()
+  }
+  if (firstEntry.directory) {
+    throw new Error("Unrecognized format for .hgt.zip file.")
+  }
+  const buf = await (firstEntry as FileEntry).arrayBuffer()
+  await zipReader.close()
+
+  return new Uint8Array(buf)
+}
+
+function getSuffix(filename: string): string {
+  const splits = filename.split(".")
+  return splits[splits.length - 1]
+}
+
 // https://github.com/whatwg/compression/blob/main/explainer.md
 async function hgtToSdf(
   mod: MainModule,
@@ -256,25 +278,20 @@ async function hgtToSdf(
   cBlob: Blob,
   source: "aws" | "fasma",
 ) {
-  let compression: CompressionFormat
-  let extLength: number
+  let ab: Uint8Array
   if (source === "aws") {
-    compression = "gzip"
-    extLength = 3 // '.gz'
+    ab = await ungz(cBlob)
   } else {
-    compression = "deflate"
-    extLength = 4 // '.zip'
+    ab = await unzip(cBlob)
   }
 
-  const decompressedStream = cBlob
-    .stream()
-    .pipeThrough(new DecompressionStream(compression))
-  const dBlob = await new Response(decompressedStream).blob()
-
-  const decompressedHgtName = filename.substring(0, filename.length - extLength)
+  const ext = getSuffix(filename)
+  const decompressedHgtName = filename.substring(
+    0,
+    filename.length - ext.length,
+  )
   const mountedHgtName = `/idbfs/${source}/${decompressedHgtName}`
 
-  const ab = new Uint8Array(await dBlob.arrayBuffer())
   mod.FS.writeFile(mountedHgtName, ab)
   mod.callMain([mountedHgtName]) // <-- Writes back into the root of the FS
 
@@ -288,6 +305,7 @@ export async function runSplat(
   config: IConfig,
   source: "aws" | "fasma",
 ) {
+  console.log("Syncing the IDBFS filesystem...")
   // Mount the IDBFS filesystem to persist the tiles; sync the IDBFS to the emscripten filesystem
   // If this directory already exists, no need to remake it
   if (!mod.FS.analyzePath("/idbfs", true).exists) {
@@ -296,6 +314,7 @@ export async function runSplat(
   mod.FS.mount(mod.IDBFS, {}, "/idbfs")
   await awaitableSyncfs(mod, true)
 
+  console.log("Running splat...")
   mod.callMain([
     // txsite.qth
     "-t",

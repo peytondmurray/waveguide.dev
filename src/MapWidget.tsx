@@ -20,20 +20,20 @@ export default function MapWidget() {
     <div id="map-wrapper">
       <MapContainer id="map" {...mapOptions}>
         <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
+        {results.map((result) => {
+          return (
+            <Marker
+              key={result.config.siteName}
+              position={[
+                result.config.transmitter.latitude,
+                result.config.transmitter.longitude,
+              ]}
+            >
+              <Popup>{result.config.siteName}</Popup>
+            </Marker>
+          )
+        })}
       </MapContainer>
-      {results.map((result) => {
-        return (
-          <Marker
-            key={result.config.siteName}
-            position={[
-              result.config.transmitter.latitude,
-              result.config.transmitter.longitude,
-            ]}
-          >
-            <Popup>{result.config.siteName}</Popup>
-          </Marker>
-        )
-      })}
     </div>
   )
 }

@@ -39,7 +39,7 @@ export default function App() {
       )
 
       await generateSplatInputs(splatModule, config)
-      setResults([...results, await runSplat(splatModule, config)])
+      setResults([...results, await runSplat(splatModule, config, "fasma")])
     }
   }
 

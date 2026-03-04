@@ -12,12 +12,13 @@
   "dependencies": {
     "@mantine/core": "^8.3.15",
     "@mantine/hooks": "^8.3.15",
+    "@zip.js/zip.js": "^2.8.22",
     "jotai": "^2.18.0",
     "leaflet": "^1.9.4",
     "react": "^19.2.4",
     "react-dom": "^19.2.4",
     "react-leaflet": "^5.0.0",
-    "splat-web": "^0.0.9"
+    "splat-web": "link:../splat-web"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.3",
