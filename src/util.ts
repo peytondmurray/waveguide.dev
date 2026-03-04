@@ -315,6 +315,58 @@ export async function runSplat(
   await awaitableSyncfs(mod, true)
 
   console.log("Running splat...")
+  const args = [
+    // txsite.qth
+    "-t",
+    "tx.qth",
+
+    // plot path loss map of TX based on an RX at X feet/meters AGL
+    "-L",
+    config.receiver.heightAGL.toString(),
+
+    // employ metric rather than imperial units for all user I/O
+    "-metric",
+
+    // modify default range for -c or -L (miles/kilometers)
+    "-R",
+    (config.simulationOptions.maxRange * 1000).toString(),
+
+    // display smooth rather than quantized contour levels
+    "-sc",
+
+    // ground clutter height (feet/meters)
+    "-gc",
+    config.environment.clutterHeight.toString(),
+
+    // display greyscale topography as white in .ppm files
+    "-ngs",
+
+    // do not produce unnecessary site or obstruction reports
+    "-N",
+
+    // filename of topographic map to generate (.ppm)
+    "-o",
+    "output.ppm",
+
+    // plot signal power level contours rather than field strength
+    "-dbm",
+
+    // threshold beyond which contours will not be displayed
+    "-db",
+    config.display.minimumSignal.toString(),
+
+    // generate Google Earth (.kml) compatible output
+    "-kml",
+
+    // invoke Longley-Rice rather than the default ITWOM model
+    "-olditm",
+
+    // sdf file directory path (overrides path in ~/.splat_path file)
+    "-d",
+    `/idbfs/${source}`,
+  ]
+  console.log({ args })
+
   mod.callMain([
     // txsite.qth
     "-t",
@@ -379,16 +431,17 @@ export async function runSplat(
 }
 
 export async function generateSplatInputs(mod: MainModule, config: IConfig) {
-  mod.FS.writeFile(
-    "tx.qth",
-    [
-      "tx",
-      config.transmitter.latitude.toFixed(6),
-      (360 - config.transmitter.longitude).toFixed(6),
-      config.transmitter.heightAGL.toFixed(2),
-      "",
-    ].join("\n"),
-  )
+  const tx = [
+    "tx",
+    config.transmitter.latitude.toFixed(6),
+    (360 - config.transmitter.longitude).toFixed(6),
+    config.transmitter.heightAGL.toFixed(2),
+    "",
+  ].join("\n")
+
+  console.log({ tx })
+
+  mod.FS.writeFile("tx.qth", tx)
 
   const climate = radioClimateMap.get(config.environment.radioClimate)
   if (climate === undefined) {
@@ -398,6 +451,24 @@ export async function generateSplatInputs(mod: MainModule, config: IConfig) {
   if (polarization === undefined) {
     throw new Error("Undefined value for polarization")
   }
+
+  const lrp_data = [
+    config.environment.groundDielectric.toFixed(3),
+    config.environment.groundConductivity.toFixed(6),
+    config.environment.atmosphericBending.toFixed(3),
+    config.transmitter.frequency.toFixed(3),
+    climate.toString(),
+    polarization.toString(),
+    (config.simulationOptions.simulationFraction / 100).toFixed(2),
+    (config.simulationOptions.timeFraction / 100).toFixed(2),
+    calculateErpWatts(
+      config.transmitter.power,
+      config.transmitter.antennaGain,
+      config.receiver.cableLoss,
+    ).toFixed(2),
+    "",
+  ].join("\n")
+  console.log({ lrp_data })
 
   mod.FS.writeFile(
     "splat.lrp",
@@ -433,8 +504,10 @@ export async function generateSplatInputs(mod: MainModule, config: IConfig) {
       ),
     )
     .concat("")
+    .join("\n")
 
-  mod.FS.writeFile("splat.dcf", ssa.join("\n"))
+  console.log({ ssa })
+  mod.FS.writeFile("splat.dcf", ssa)
   await awaitableSyncfs(mod, false)
 }
 
