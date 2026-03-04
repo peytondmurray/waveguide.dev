@@ -5,18 +5,13 @@ import Splat, { type MainModule } from "splat-web/splat"
 import Srtm2sdf from "splat-web/srtm2sdf"
 import MapWidget from "./MapWidget"
 import Navbar from "./Navbar"
-import {
-  downloadTiles,
-  generateSplatInputs,
-  getKmlBounds,
-  runSplat,
-} from "./util"
+import { downloadTiles, generateSplatInputs, runSplat } from "./util"
 
 import "@mantine/core/styles.css"
 
 import "./App.css"
 import { useAtom } from "jotai"
-import { configAtom, progressAtom } from "./atoms"
+import { configAtom, progressAtom, resultsAtom } from "./atoms"
 
 export default function App() {
   const [splatModule, setSplatModule] = useState<MainModule | null>(null)
@@ -30,6 +25,7 @@ export default function App() {
   const [config, _setConfig] = useAtom(configAtom)
   const [_progress, setProgress] = useAtom(progressAtom)
   const [opened, { toggle }] = useDisclosure()
+  const [results, setResults] = useAtom(resultsAtom)
 
   async function handleRun() {
     if (splatModule !== null && srtm2sdfModule !== null) {
@@ -39,11 +35,11 @@ export default function App() {
         config.transmitter.longitude,
         config.simulationOptions.maxRange,
         setProgress,
+        "fasma",
       )
 
       await generateSplatInputs(splatModule, config)
-      await runSplat(splatModule, config)
-      getKmlBounds(splatModule)
+      setResults([...results, await runSplat(splatModule, config)])
     }
   }
 

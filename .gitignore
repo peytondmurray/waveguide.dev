@@ -25,3 +25,6 @@ dist-ssr
 
 wasm/
 pnpm-workspace.yaml
+
+# Local Netlify folder
+.netlify

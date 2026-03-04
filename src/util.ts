@@ -1,6 +1,7 @@
 import type { MainModule } from "splat-web/splat"
 import { toScaledStringArray } from "./colormaps"
 import type { IConfig } from "./config"
+import type { Bounds } from "./result"
 
 type Tile = {
   latMin: number
@@ -9,10 +10,9 @@ type Tile = {
   longMax: number
   phi: number
   lambda: number
-  shortHgtName: string
-  hgtName: string
+  filename: string
+  url: string
   sdfName: string
-  sdfHDName: string
 }
 
 const radioClimateMap = new Map([
@@ -62,7 +62,12 @@ function radToDeg(rad: number): number {
  * @param maxRange - Range [m] of tiles to include from the starting latitude/longitude
  * @returns
  */
-function listTiles(lat: number, long: number, maxRange: number): Tile[] {
+function listTiles(
+  lat: number,
+  long: number,
+  maxRange: number,
+  source: "aws" | "fasma",
+): Tile[] {
   const rEarth = 6378137
 
   const dphi = radToDeg(maxRange / rEarth)
@@ -91,6 +96,16 @@ function listTiles(lat: number, long: number, maxRange: number): Tile[] {
       const absPhi = Math.abs(phi).toFixed(0)
       const absLambda = Math.abs(lambda).toFixed(0)
 
+      let filename: string
+      let url: string
+      if (source === "aws") {
+        filename = `${ns}${absPhi}${ew}${absLambda}.hgt.gz`
+        url = `https://s3.amazonaws.com/elevation-tiles-prod/skadi/${ns}${absPhi}/${filename}`
+      } else {
+        filename = `${ns}${absPhi}${ew}${absLambda}.SRTMGL3S.hgt.zip`
+        url = `https://srtm.fasma.org/${filename}`
+      }
+
       tiles.push({
         latMin: phi,
         latMax: phi + 1,
@@ -98,10 +113,9 @@ function listTiles(lat: number, long: number, maxRange: number): Tile[] {
         lambda,
         longMin,
         longMax,
-        shortHgtName: `${ns}${absPhi}${ew}${absLambda}.hgt.gz`,
-        hgtName: `${ns}${absPhi}/${ns}${absPhi}${ew}${absLambda}.hgt.gz`,
+        filename,
+        url,
         sdfName: `${phi}:${phi + 1}:${longMin}:${longMax}.sdf`,
-        sdfHDName: `${phi}:${phi + 1}:${longMin}:${longMax}-hd.sdf`,
       })
     }
   }
@@ -171,11 +185,8 @@ export async function downloadTiles(
     value: number
     label: string
   }) => void,
+  source: "aws" | "fasma",
 ) {
-  const tiles = listTiles(lat, long, maxRange)
-  let done = 0
-  progressCallback({ value: 0, label: "Downloading tiles..." })
-
   // Mount the IDBFS filesystem to persist the tiles; sync the IDBFS to the emscripten filesystem
   // If this directory already exists, no need to remake it
   if (!mod.FS.analyzePath("/idbfs", true).exists) {
@@ -184,32 +195,42 @@ export async function downloadTiles(
   mod.FS.mount(mod.IDBFS, {}, "/idbfs")
   await awaitableSyncfs(mod, true)
 
-  // Download and convert all the .hgt.gz -> .sdf. Persist .hgt so that downloads only need to
+  // Generate the subdirectories for aws and fasma
+  if (!mod.FS.analyzePath("/idbfs/aws", true).exists) {
+    mod.FS.mkdir("/idbfs/aws")
+  }
+  if (!mod.FS.analyzePath("/idbfs/fasma", true).exists) {
+    mod.FS.mkdir("/idbfs/fasma")
+  }
+
+  let done = 0
+  progressCallback({ value: 0, label: "Downloading tiles..." })
+  const tiles = listTiles(lat, long, maxRange, source)
+
+  // Download and convert all the .hgt.{gz,zip} -> .sdf. Persist .hgt so that downloads only need to
   // happen as needed
   await Promise.all(
     tiles
       .filter(
-        ({ sdfName }) => !mod.FS.analyzePath(`/idbfs/${sdfName}`, true).exists,
+        ({ sdfName }) =>
+          !mod.FS.analyzePath(`/idbfs/${source}/${sdfName}`, true).exists,
       )
-      .map(async ({ hgtName, shortHgtName, sdfName }) => {
+      .map(async ({ filename, url, sdfName }) => {
         let response: Response
 
-        if (mod.FS.analyzePath(`/${shortHgtName}`, true).exists) {
+        if (mod.FS.analyzePath(`/idbfs/${source}/${filename}`, true).exists) {
           // If the .hgt.gz exists in the filesystem already, read it as a blob
 
-          const contents = mod.FS.readFile(`/idbfs/${shortHgtName}`, {
+          const contents = mod.FS.readFile(`/idbfs/${source}/${filename}`, {
             encoding: "binary",
           })
           const blob = new Blob([contents])
           response = new Response(blob)
         } else {
           // Otherwise fetch it from AWS
-
-          response = await fetch(
-            `https://s3.amazonaws.com/elevation-tiles-prod/skadi/${hgtName}`,
-          )
+          response = await fetch(url)
         }
-        await hgtToSdf(mod, shortHgtName, sdfName, await response.blob())
+        await hgtToSdf(mod, filename, sdfName, await response.blob(), source)
         done++
         progressCallback({
           value: done / tiles.length,
@@ -219,35 +240,54 @@ export async function downloadTiles(
   )
 
   await awaitableSyncfs(mod, false)
-  console.log(mod.FS.readdir("/idbfs"))
+  console.log({
+    idbfs: mod.FS.readdir("/idbfs"),
+    aws: mod.FS.readdir("/idbfs/aws"),
+    fasma: mod.FS.readdir("/idbfs/fasma"),
+  })
   mod.FS.unmount("/idbfs")
 }
 
 // https://github.com/whatwg/compression/blob/main/explainer.md
 async function hgtToSdf(
   mod: MainModule,
-  shortHgtName: string,
+  filename: string,
   sdfName: string,
   cBlob: Blob,
+  source: "aws" | "fasma",
 ) {
+  let compression: CompressionFormat
+  let extLength: number
+  if (source === "aws") {
+    compression = "gzip"
+    extLength = 3 // '.gz'
+  } else {
+    compression = "deflate"
+    extLength = 4 // '.zip'
+  }
+
   const decompressedStream = cBlob
     .stream()
-    .pipeThrough(new DecompressionStream("gzip"))
+    .pipeThrough(new DecompressionStream(compression))
   const dBlob = await new Response(decompressedStream).blob()
 
-  const decompressedHgtName = shortHgtName.substring(0, shortHgtName.length - 3)
-  const mountedHgtName = `/idbfs/${decompressedHgtName}`
+  const decompressedHgtName = filename.substring(0, filename.length - extLength)
+  const mountedHgtName = `/idbfs/${source}/${decompressedHgtName}`
 
   const ab = new Uint8Array(await dBlob.arrayBuffer())
   mod.FS.writeFile(mountedHgtName, ab)
-  mod.callMain([mountedHgtName]) // <-- Writes back into the root of the srtm2sdfMod FS
+  mod.callMain([mountedHgtName]) // <-- Writes back into the root of the FS
 
   // Can't just rename between filesystems - need to copy the file contents instead
   const content = mod.FS.readFile(sdfName, { encoding: "binary" })
-  mod.FS.writeFile(`/idbfs/${sdfName}`, content)
+  mod.FS.writeFile(`/idbfs/${source}/${sdfName}`, content)
 }
 
-export async function runSplat(mod: MainModule, config: IConfig) {
+export async function runSplat(
+  mod: MainModule,
+  config: IConfig,
+  source: "aws" | "fasma",
+) {
   // Mount the IDBFS filesystem to persist the tiles; sync the IDBFS to the emscripten filesystem
   // If this directory already exists, no need to remake it
   if (!mod.FS.analyzePath("/idbfs", true).exists) {
@@ -270,7 +310,7 @@ export async function runSplat(mod: MainModule, config: IConfig) {
 
     // modify default range for -c or -L (miles/kilometers)
     "-R",
-    (config.simulationOptions.maxRange / 1000).toString(),
+    (config.simulationOptions.maxRange * 1000).toString(),
 
     // display smooth rather than quantized contour levels
     "-sc",
@@ -304,11 +344,19 @@ export async function runSplat(mod: MainModule, config: IConfig) {
 
     // sdf file directory path (overrides path in ~/.splat_path file)
     "-d",
-    "/idbfs/",
+    `/idbfs/${source}`,
   ])
 
-  console.log(mod.FS.readdir("/idbfs"))
-  console.log(mod.FS.readdir("/"))
+  console.log({
+    idbfs: mod.FS.readdir("/idbfs"),
+    aws: mod.FS.readdir("/idbfs/aws"),
+    fasma: mod.FS.readdir("/idbfs/fasma"),
+  })
+
+  return {
+    bounds: getKmlBounds(mod),
+    config,
+  }
 }
 
 export async function generateSplatInputs(mod: MainModule, config: IConfig) {
@@ -379,22 +427,16 @@ function calculateErpWatts(
   return 10 ** ((txPower + txGain - systemLoss - 30) / 10)
 }
 
-export function getKmlBounds(mod: MainModule): {
-  north: number
-  south: number
-  east: number
-  west: number
-} {
+export function getKmlBounds(mod: MainModule): Bounds {
   const doc = new DOMParser().parseFromString(
     mod.FS.readFile("output.kml", { encoding: "utf8" }) as unknown as string,
     "text/xml",
   )
 
-  console.log({ doc })
   return {
-    north: 0,
-    south: 0,
-    east: 0,
-    west: 0,
+    north: Number.parseFloat(doc.getElementsByTagName("north")[0].textContent),
+    south: Number.parseFloat(doc.getElementsByTagName("south")[0].textContent),
+    east: Number.parseFloat(doc.getElementsByTagName("east")[0].textContent),
+    west: Number.parseFloat(doc.getElementsByTagName("west")[0].textContent),
   }
 }
