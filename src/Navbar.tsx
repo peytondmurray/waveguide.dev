@@ -5,17 +5,29 @@ import {
   Progress,
   Select,
   Stack,
+  Text,
   TextInput,
 } from "@mantine/core"
 import "./Navbar.css"
 
 import { useAtom } from "jotai"
-import { configAtom, progressAtom } from "./atoms"
+import { configAtom, progressAtom, resultsAtom } from "./atoms"
 import type { IConfig } from "./config"
 
 export default function Navbar({ handleRun }: { handleRun: () => void }) {
+  const [results, _setResults] = useAtom(resultsAtom)
   const [config, setConfig] = useAtom(configAtom)
   const [progress, _setProgres] = useAtom(progressAtom)
+
+  const validSiteName = results.every(
+    (res) => res.config.siteName !== config.siteName,
+  )
+
+  function startRun() {
+    if (validSiteName) {
+      handleRun()
+    }
+  }
 
   /**
    * Helper which makes the nested object destructuring a little better when updating the config.
@@ -273,7 +285,12 @@ export default function Navbar({ handleRun }: { handleRun: () => void }) {
         </Progress.Section>
       </Progress.Root>
       <Stack className="section">
-        <Button onClick={handleRun}>Run simulation</Button>
+        {results.some((res) => res.config.siteName === config.siteName) ? (
+          <Text>{`A site named '${config.siteName}' already exists!`}</Text>
+        ) : null}
+        <Button onClick={startRun} color={validSiteName ? "blue" : "red"}>
+          Run Simulation
+        </Button>
       </Stack>
     </Stack>
   )

@@ -8,7 +8,7 @@ import {
   Popup,
   TileLayer,
 } from "react-leaflet"
-import { configAtom, resultsAtom } from "./atoms"
+import { activeAtom, configAtom, resultsAtom } from "./atoms"
 
 import "leaflet/dist/leaflet.css"
 import "./MapWidget.css"
@@ -23,6 +23,7 @@ export default function MapWidget() {
   }
 
   const [results, _setResults] = useAtom(resultsAtom)
+  const [active, setActive] = useAtom(activeAtom)
 
   return (
     <div id="map-wrapper">
@@ -36,6 +37,12 @@ export default function MapWidget() {
                   config.transmitter.latitude,
                   config.transmitter.longitude,
                 ]}
+                eventHandlers={{
+                  click: () =>
+                    setActive(
+                      config.siteName === active ? null : config.siteName,
+                    ),
+                }}
               >
                 <Popup>{config.siteName}</Popup>
               </Marker>
@@ -48,7 +55,7 @@ export default function MapWidget() {
                   )
                 }
                 url={dataUrl}
-                opacity={0.7}
+                opacity={config.siteName === active ? 0.7 : 0}
                 zIndex={10}
               />
             </React.Fragment>

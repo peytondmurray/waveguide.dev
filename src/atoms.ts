@@ -9,5 +9,6 @@ const progressAtom = atom<{ value: number; label: string }>({
   label: "",
 })
 const resultsAtom = atom<Result[]>([])
+const activeAtom = atom<string | null>(null)
 
-export { configAtom, simulationsAtom, progressAtom, resultsAtom }
+export { configAtom, simulationsAtom, progressAtom, resultsAtom, activeAtom }

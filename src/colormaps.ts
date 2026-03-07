@@ -235,4 +235,124 @@ export function toScaledStringArray(
   })
 }
 
+// https://en.wikipedia.org/wiki/SRGB#Transfer_function_(%22gamma%22)
+function rgbToLin(val: number) {
+  // Send this function a decimal sRGB gamma encoded color value
+  // between 0.0 and 1.0, and it returns a linearized value.
+  if (val <= 0.04045) {
+    return val / 12.92
+  } else {
+    return ((val + 0.055) / 1.055) ** 2.4
+  }
+}
+
+// https://en.wikipedia.org/wiki/Relative_luminance#Relative_luminance_and_%22gamma_encoded%22_colorspaces
+function rgbToYaPixel(rgb: Uint8ClampedArray): number {
+  const [sR, sG, sB] = rgb
+  const vR = sR / 255
+  const vG = sG / 255
+  const vB = sB / 255
+
+  return Math.round(
+    (0.2126 * rgbToLin(vR) + 0.7152 * rgbToLin(vG) + 0.0722 * rgbToLin(vB)) *
+      255,
+  )
+}
+
+function rgbToY(rgb: Uint8ClampedArray): Uint8ClampedArray {
+  const nPixels = rgb.length / 3
+  const ya = new Uint8ClampedArray(nPixels)
+  for (let i = 0; i < nPixels; i++) {
+    ya[i] = rgbToYaPixel(rgb.slice(3 * i, 3 * i + 3))
+  }
+  return ya
+}
+
+/**
+ * Binary search the colormap for the index of the cmap entry just below the given number.
+ * @param cmap -
+ * @param value -
+ */
+export function binaryLookup(cmap: number[][], value: number): number {
+  let l = 0
+  let r = cmap.length - 1
+
+  while (l < r) {
+    // Round the midpoint up so we never get stuck if the l and r differ by 1
+    const m = Math.ceil((r + l) / 2)
+    if (cmap[m][0] <= value) {
+      l = m
+    } else {
+      r = m - 1
+    }
+  }
+
+  return l
+}
+
+/**
+ * Map a luminance value
+ *
+ * @param cmap - Mapped colormap: an array of [value, r, g, b] arrays
+ * @param value - Luminance value to remap to rgba
+ * @returns
+ */
+function cmapInterpolate(cmap: number[][], value: number): number[] {
+  const ilow = binaryLookup(cmap, value)
+  if (ilow === 0) {
+    return cmap[ilow].slice(1)
+  }
+  if (ilow === cmap.length - 1) {
+    return cmap[cmap.length - 1].slice(1)
+  }
+
+  // Get the [value, r, g, b] arrays for the cmal level on either side of the value
+  const lowVrgb = cmap[ilow]
+  const highVrgb = cmap[ilow + 1]
+  const dv = highVrgb[0] - lowVrgb[0]
+
+  // Linearly interpolate between the colors on either side of the value
+  const newRgb = new Array(3)
+  for (let i = 0, j = 1; i < 3; i++, j++) {
+    newRgb[i] =
+      lowVrgb[j] + ((value - lowVrgb[0]) * (highVrgb[j] - lowVrgb[j])) / dv
+  }
+  return newRgb
+}
+
+/**
+ * @param rgb - RGB data from a ppm file. Colormapped to whatever splat uses by default
+ * @param name - Name of the colormap to use for plotting
+ * @param minval - Value the minimum of the colormap should be associated to
+ * @param maxval - Value the maximum of the colormap should be associated to
+ * @returns RGBA data mapped to the chosen linear colormap; null values produced by splat are
+ *  set to be transparent
+ */
+export function toCmap(
+  rgb: Uint8ClampedArray,
+  name: string,
+  minval: number,
+  maxval: number,
+): Uint8ClampedArray {
+  const Y = rgbToY(rgb)
+
+  const cmapData = cm.get(name)
+  if (cmapData === undefined) {
+    throw new Error(`No colormap exists named ${name}. Aborting.`)
+  }
+  const step = (maxval - minval) / (cmapData.length - 1)
+  const mappedCmap = cmapData.map((tup, i) => [minval + i * step, ...tup])
+
+  const result = new Uint8ClampedArray((4 * rgb.length) / 3)
+  let i = 0
+  for (const val of Y) {
+    const [r, g, b] = cmapInterpolate(mappedCmap, val)
+    result[i++] = r
+    result[i++] = g
+    result[i++] = b
+    result[i++] = val === 255 ? 0 : 255
+  }
+  return result
+}
+
 export default cm

@@ -11,7 +11,7 @@ import "@mantine/core/styles.css"
 
 import "./App.css"
 import { useAtom } from "jotai"
-import { configAtom, progressAtom, resultsAtom } from "./atoms"
+import { activeAtom, configAtom, progressAtom, resultsAtom } from "./atoms"
 
 export default function App() {
   const [splatModule, setSplatModule] = useState<MainModule | null>(null)
@@ -26,6 +26,7 @@ export default function App() {
   const [_progress, setProgress] = useAtom(progressAtom)
   const [opened, { toggle }] = useDisclosure()
   const [results, setResults] = useAtom(resultsAtom)
+  const [_active, setActive] = useAtom(activeAtom)
 
   async function handleRun() {
     if (splatModule !== null && srtm2sdfModule !== null) {
@@ -40,6 +41,7 @@ export default function App() {
 
       await generateSplatInputs(splatModule, config)
       setResults([...results, await runSplat(splatModule, config, "fasma")])
+      setActive(config.siteName)
     }
   }
 

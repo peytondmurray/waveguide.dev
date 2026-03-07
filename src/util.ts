@@ -1,6 +1,6 @@
 import { BlobReader, type FileEntry, ZipReader } from "@zip.js/zip.js"
 import type { MainModule } from "splat-web/splat"
-import { toScaledStringArray } from "./colormaps"
+import { toCmap } from "./colormaps"
 import type { IConfig } from "./config"
 import type { Bounds, Result } from "./result"
 
@@ -33,44 +33,6 @@ function toDataUrl(raster: ImageData): string {
   const ctx = canvas.getContext("2d")
   ctx?.putImageData(raster, 0, 0)
   return canvas.toDataURL()
-}
-
-// https://en.wikipedia.org/wiki/SRGB#Transfer_function_(%22gamma%22)
-function rgbToLin(val: number) {
-  // Send this function a decimal sRGB gamma encoded color value
-  // between 0.0 and 1.0, and it returns a linearized value.
-  if (val <= 0.04045) {
-    return val / 12.92
-  } else {
-    return ((val + 0.055) / 1.055) ** 2.4
-  }
-}
-
-// https://en.wikipedia.org/wiki/Relative_luminance#Relative_luminance_and_%22gamma_encoded%22_colorspaces
-function rgbToLuminanceRGBPixel(rgb: Uint8ClampedArray): Uint8ClampedArray {
-  const [sR, sG, sB] = rgb
-  const vR = sR / 255
-  const vG = sG / 255
-  const vB = sB / 255
-
-  const Y = Math.round(
-    (0.2126 * rgbToLin(vR) + 0.7152 * rgbToLin(vG) + 0.0722 * rgbToLin(vB)) *
-      255,
-  )
-  const alpha = [vR, vG, vB].every((item) => item === 1) ? 0 : 255
-  return Uint8ClampedArray.from([Y, Y, Y, alpha])
-}
-
-function rgbToLuminanceRgba(rgb: Uint8ClampedArray): Uint8ClampedArray {
-  const nPixels = rgb.length / 3
-  const yrgba = new Uint8ClampedArray(nPixels * 4)
-  for (let i = 0; i < nPixels; i++) {
-    const vals = rgbToLuminanceRGBPixel(rgb.slice(3 * i, 3 * i + 3))
-    for (let j = 0; j < 4; j++) {
-      yrgba[4 * i + j] = vals[j]
-    }
-  }
-  return yrgba
 }
 
 function nextNonSpaceByte(arr: Uint8Array, start: number): number {
@@ -157,14 +119,14 @@ function parsePpm(arr: Uint8Array): ImageData {
     throw new Error("Multibyte ppms not supported.")
   }
 
-  const yrgba = rgbToLuminanceRgba(rgb)
+  const cmap = toCmap(rgb, "magma", 0, maxval)
 
-  if (height * width * 4 !== yrgba.length) {
+  if (height * width * 4 !== cmap.length) {
     throw new Error(
       "Height and width of the splat output doesn't match the image pixel array size.",
     )
   }
-  return new ImageData(yrgba, width, height, { pixelFormat: "rgba-unorm8" })
+  return new ImageData(cmap, width, height, { pixelFormat: "rgba-unorm8" })
 }
 
 /**
@@ -557,23 +519,23 @@ export async function generateSplatInputs(mod: MainModule, config: IConfig) {
 
   mod.FS.writeFile("splat.lrp", lrp)
 
-  const ssa = [
-    "; SPLAT! Auto-generated DBM Signal Level Color Definition",
-    ";",
-    "; Format: dBm: red, green, blue",
-    ";",
-  ]
-    .concat(
-      toScaledStringArray(
-        config.display.colormap,
-        config.display.minimumSignal,
-        config.display.maximumSignal,
-      ),
-    )
-    .concat("")
-    .join("\n")
-
-  mod.FS.writeFile("splat.dcf", ssa)
+  // const ssa = [
+  //   "; SPLAT! Auto-generated DBM Signal Level Color Definition",
+  //   ";",
+  //   "; Format: dBm: red, green, blue",
+  //   ";",
+  // ]
+  //   .concat(
+  //     toScaledStringArray(
+  //       config.display.colormap,
+  //       config.display.minimumSignal,
+  //       config.display.maximumSignal,
+  //     ),
+  //   )
+  //   .concat("")
+  //   .join("\n")
+  //
+  // mod.FS.writeFile("splat.dcf", ssa)
   await awaitableSyncfs(mod, false)
 }
 
