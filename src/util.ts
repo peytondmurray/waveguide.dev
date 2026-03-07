@@ -57,7 +57,7 @@ function rgbToLuminanceRGBPixel(rgb: Uint8ClampedArray): Uint8ClampedArray {
     (0.2126 * rgbToLin(vR) + 0.7152 * rgbToLin(vG) + 0.0722 * rgbToLin(vB)) *
       255,
   )
-  const alpha = [vR, vG, vB].every((item) => item === 255) ? 0 : 255
+  const alpha = [vR, vG, vB].every((item) => item === 1) ? 0 : 255
   return Uint8ClampedArray.from([Y, Y, Y, alpha])
 }
 

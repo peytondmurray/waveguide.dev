@@ -48,7 +48,7 @@ export default function MapWidget() {
                   )
                 }
                 url={dataUrl}
-                opacity={0.5}
+                opacity={0.7}
                 zIndex={10}
               />
             </React.Fragment>
