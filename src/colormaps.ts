@@ -187,15 +187,15 @@ export type colormap = "viridis" | "plasma" | "magma" | "cividis" | "inferno"
  * @returns The left-padded number, as a string
  */
 function padNumber(n: number, l: number): string {
-  return `${n}`.padStart(l, "0")
+  return `${n}`.padStart(l, " ")
 }
 
 /**
- * Format a number, left padded with zeroes and including a sign (even for positive numbers).
+ * Format a number, left padded with spaces and including a sign (even for positive numbers).
  *
  * @param n - Number to display
  * @param l - Number of digits to left-pad to
- * @returns The left-padded number string, with the sign included
+ * @returns The left-padded number string, with the sign included (in front of the padding)
  */
 function formatPM(n: number, l: number): string {
   if (n >= 0) {
@@ -223,7 +223,7 @@ export function toScaledStringArray(
   max: number,
 ): string[] {
   const cmap = cm.get(cmName) as number[][]
-  const step = (max - min) / cmap.length
+  const step = (max - min) / (cmap.length - 1)
 
   const linspace: number[] = []
   for (let x = min; x < max; x += step) {

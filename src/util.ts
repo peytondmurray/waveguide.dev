@@ -57,7 +57,7 @@ function rgbToLuminanceRGBPixel(rgb: Uint8ClampedArray): Uint8ClampedArray {
     (0.2126 * rgbToLin(vR) + 0.7152 * rgbToLin(vG) + 0.0722 * rgbToLin(vB)) *
       255,
   )
-  const alpha = [vR, vG, vB].every((item) => item === 255) ? 255 : 0
+  const alpha = [vR, vG, vB].every((item) => item === 255) ? 0 : 255
   return Uint8ClampedArray.from([Y, Y, Y, alpha])
 }
 
@@ -65,7 +65,7 @@ function rgbToLuminanceRgba(rgb: Uint8ClampedArray): Uint8ClampedArray {
   const nPixels = rgb.length / 3
   const yrgba = new Uint8ClampedArray(nPixels * 4)
   for (let i = 0; i < nPixels; i++) {
-    const vals = rgbToLuminanceRGBPixel(rgb.slice(i, i + 3))
+    const vals = rgbToLuminanceRGBPixel(rgb.slice(3 * i, 3 * i + 3))
     for (let j = 0; j < 4; j++) {
       yrgba[4 * i + j] = vals[j]
     }
@@ -522,7 +522,7 @@ export async function generateSplatInputs(mod: MainModule, config: IConfig) {
   const tx = [
     "tx",
     config.transmitter.latitude.toFixed(6),
-    (360 - config.transmitter.longitude).toFixed(6),
+    clamp0to360(360 - config.transmitter.longitude).toFixed(6),
     config.transmitter.heightAGL.toFixed(2),
     "",
   ].join("\n")
@@ -538,25 +538,24 @@ export async function generateSplatInputs(mod: MainModule, config: IConfig) {
     throw new Error("Undefined value for polarization")
   }
 
-  mod.FS.writeFile(
-    "splat.lrp",
-    [
-      config.environment.groundDielectric.toFixed(3),
-      config.environment.groundConductivity.toFixed(6),
-      config.environment.atmosphericBending.toFixed(3),
-      config.transmitter.frequency.toFixed(3),
-      climate.toString(),
-      polarization.toString(),
-      (config.simulationOptions.simulationFraction / 100).toFixed(2),
-      (config.simulationOptions.timeFraction / 100).toFixed(2),
-      calculateErpWatts(
-        config.transmitter.power,
-        config.transmitter.antennaGain,
-        config.receiver.cableLoss,
-      ).toFixed(2),
-      "",
-    ].join("\n"),
-  )
+  const lrp = [
+    config.environment.groundDielectric.toFixed(3),
+    config.environment.groundConductivity.toFixed(6),
+    config.environment.atmosphericBending.toFixed(3),
+    config.transmitter.frequency.toFixed(3),
+    climate.toString(),
+    polarization.toString(),
+    (config.simulationOptions.simulationFraction / 100).toFixed(2),
+    (config.simulationOptions.timeFraction / 100).toFixed(2),
+    calculateErpWatts(
+      config.transmitter.power,
+      config.transmitter.antennaGain,
+      config.receiver.cableLoss,
+    ).toFixed(2),
+    "",
+  ].join("\n")
+
+  mod.FS.writeFile("splat.lrp", lrp)
 
   const ssa = [
     "; SPLAT! Auto-generated DBM Signal Level Color Definition",

@@ -1,5 +1,6 @@
 import { useAtom } from "jotai"
 import { LatLngBounds } from "leaflet"
+import React from "react"
 import {
   ImageOverlay,
   MapContainer,
@@ -28,9 +29,9 @@ export default function MapWidget() {
       <MapContainer id="map" {...mapOptions}>
         {results.map(({ config, dataUrl, bounds }) => {
           return (
-            <>
+            <React.Fragment key={config.siteName}>
               <Marker
-                key={config.siteName}
+                key={`${config.siteName}-marker`}
                 position={[
                   config.transmitter.latitude,
                   config.transmitter.longitude,
@@ -39,7 +40,7 @@ export default function MapWidget() {
                 <Popup>{config.siteName}</Popup>
               </Marker>
               <ImageOverlay
-                key={config.siteName}
+                key={`${config.siteName}-overlay`}
                 bounds={
                   new LatLngBounds(
                     [bounds.south, bounds.west],
@@ -50,7 +51,7 @@ export default function MapWidget() {
                 opacity={0.5}
                 zIndex={10}
               />
-            </>
+            </React.Fragment>
           )
         })}
         <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
