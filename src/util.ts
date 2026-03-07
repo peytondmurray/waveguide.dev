@@ -2,7 +2,7 @@ import { BlobReader, type FileEntry, ZipReader } from "@zip.js/zip.js"
 import type { MainModule } from "splat-web/splat"
 import { toScaledStringArray } from "./colormaps"
 import type { IConfig } from "./config"
-import type { Bounds } from "./result"
+import type { Bounds, Result } from "./result"
 
 type Tile = {
   filename: string
@@ -24,6 +24,148 @@ const polarizationMap = new Map([
   ["horizontal", 1],
   ["vertical", 2],
 ])
+
+function toDataUrl(raster: ImageData): string {
+  const canvas = document.createElement("canvas")
+  canvas.width = raster.width
+  canvas.height = raster.height
+
+  const ctx = canvas.getContext("2d")
+  ctx?.putImageData(raster, 0, 0)
+  return canvas.toDataURL()
+}
+
+// https://en.wikipedia.org/wiki/SRGB#Transfer_function_(%22gamma%22)
+function rgbToLin(val: number) {
+  // Send this function a decimal sRGB gamma encoded color value
+  // between 0.0 and 1.0, and it returns a linearized value.
+  if (val <= 0.04045) {
+    return val / 12.92
+  } else {
+    return ((val + 0.055) / 1.055) ** 2.4
+  }
+}
+
+// https://en.wikipedia.org/wiki/Relative_luminance#Relative_luminance_and_%22gamma_encoded%22_colorspaces
+function rgbToLuminanceRGBPixel(rgb: Uint8ClampedArray): Uint8ClampedArray {
+  const [sR, sG, sB] = rgb
+  const vR = sR / 255
+  const vG = sG / 255
+  const vB = sB / 255
+
+  const Y = Math.round(
+    (0.2126 * rgbToLin(vR) + 0.7152 * rgbToLin(vG) + 0.0722 * rgbToLin(vB)) *
+      255,
+  )
+  const alpha = [vR, vG, vB].every((item) => item === 255) ? 255 : 0
+  return Uint8ClampedArray.from([Y, Y, Y, alpha])
+}
+
+function rgbToLuminanceRgba(rgb: Uint8ClampedArray): Uint8ClampedArray {
+  const nPixels = rgb.length / 3
+  const yrgba = new Uint8ClampedArray(nPixels * 4)
+  for (let i = 0; i < nPixels; i++) {
+    const vals = rgbToLuminanceRGBPixel(rgb.slice(i, i + 3))
+    for (let j = 0; j < 4; j++) {
+      yrgba[4 * i + j] = vals[j]
+    }
+  }
+  return yrgba
+}
+
+function nextNonSpaceByte(arr: Uint8Array, start: number): number {
+  let i = start
+  while (i < arr.length && [10, 32].includes(arr[i])) {
+    i++
+  }
+  if (i === arr.length) {
+    throw new Error("Unable to parse the output ppm file. Aborting.")
+  }
+  return i
+}
+
+function parsePpm(arr: Uint8Array): ImageData {
+  // P6\n2400 2400\n255\nRGB data, one byte after another. Spaces or newlines can be repeated.
+
+  // Pass by the first 3 bytes: P6\n
+  // Read until space
+  const decoder = new TextDecoder()
+
+  if (arr.length < 4) {
+    throw new Error("Malformed ppm file. Aborting.")
+  }
+  let i = 3
+  let width: number | null = null
+
+  // Skip any spaces between 'P6\n' and the next byte representing a number
+  // Advance until you reach ' ' or '\n', then slice out the number
+  i = nextNonSpaceByte(arr, i)
+  for (let j = i; j < arr.length; j++) {
+    if ([10, 32].includes(arr[j])) {
+      width = Number.parseInt(decoder.decode(arr.slice(i, j)), 10)
+      i = j + 1
+      break
+    }
+  }
+
+  i = nextNonSpaceByte(arr, i)
+  let height: number | null = null
+  // Advance until you hit ' ' (char code 32) or '\n' (char code 10)
+  for (let j = i; j < arr.length; j++) {
+    if ([10, 32].includes(arr[j])) {
+      height = Number.parseInt(decoder.decode(arr.slice(i, j)), 10)
+      i = j + 1
+      break
+    }
+  }
+
+  if (
+    width === null ||
+    height === null ||
+    Number.isNaN(width) ||
+    Number.isNaN(height)
+  ) {
+    throw new Error("Couldn't find width or length of the output.ppm image.")
+  }
+
+  i = nextNonSpaceByte(arr, i)
+  let maxval: number | null = null
+  for (let j = i; j < arr.length; j++) {
+    if ([10, 32].includes(arr[j])) {
+      maxval = Number.parseInt(decoder.decode(arr.slice(i, j)), 10)
+      i = j + 1
+      break
+    }
+  }
+
+  if (maxval === null) {
+    throw new Error("Couldn't find max value for the output.ppm image.")
+  }
+
+  // ppm image files contain 3-tuples of (r, g, b) values. Each value is 1 byte
+  // (if the max value < 256) or 2 bytes (if the max value is anything else)
+  const valueSize = maxval < 256 ? 1 : 2
+
+  i = nextNonSpaceByte(arr, i)
+  // const nVals = (arr.length - j)/(3*valueSize)
+  // const rgb = new Array(nVals)
+
+  let rgb: Uint8ClampedArray
+  if (valueSize === 1) {
+    rgb = Uint8ClampedArray.from(arr.slice(i))
+  } else {
+    throw new Error("Multibyte ppms not supported.")
+  }
+
+  const yrgba = rgbToLuminanceRgba(rgb)
+
+  if (height * width * 4 !== yrgba.length) {
+    throw new Error(
+      "Height and width of the splat output doesn't match the image pixel array size.",
+    )
+  }
+  return new ImageData(yrgba, width, height, { pixelFormat: "rgba-unorm8" })
+}
 
 /**
  * Convert degrees to radians.
@@ -63,7 +205,7 @@ function listTiles(
   maxRange: number,
   source: "aws" | "fasma",
 ): Tile[] {
-  const rEarth = 6378137
+  const rEarth = 6378.137
 
   const dphi = radToDeg(maxRange / rEarth)
   const dtheta = radToDeg(
@@ -109,8 +251,6 @@ function listTiles(
       })
     }
   }
-
-  console.log({ tiles })
 
   return tiles
 }
@@ -230,11 +370,6 @@ export async function downloadTiles(
   )
 
   await awaitableSyncfs(mod, false)
-  console.log({
-    idbfs: mod.FS.readdir("/idbfs"),
-    aws: mod.FS.readdir("/idbfs/aws"),
-    fasma: mod.FS.readdir("/idbfs/fasma"),
-  })
   mod.FS.unmount("/idbfs")
 }
 
@@ -303,8 +438,8 @@ async function hgtToSdf(
 export async function runSplat(
   mod: MainModule,
   config: IConfig,
-  source: "aws" | "fasma",
-) {
+  _source: "aws" | "fasma",
+): Promise<Result> {
   console.log("Syncing the IDBFS filesystem...")
   // Mount the IDBFS filesystem to persist the tiles; sync the IDBFS to the emscripten filesystem
   // If this directory already exists, no need to remake it
@@ -314,119 +449,72 @@ export async function runSplat(
   mod.FS.mount(mod.IDBFS, {}, "/idbfs")
   await awaitableSyncfs(mod, true)
 
-  console.log("Running splat...")
-  const args = [
-    // txsite.qth
-    "-t",
-    "tx.qth",
+  try {
+    console.log("Running splat...")
 
-    // plot path loss map of TX based on an RX at X feet/meters AGL
-    "-L",
-    config.receiver.heightAGL.toString(),
+    // mod.callMain([
+    //   // txsite.qth
+    //   "-t",
+    //   "tx.qth",
+    //
+    //   // plot path loss map of TX based on an RX at X feet/meters AGL
+    //   "-L",
+    //   config.receiver.heightAGL.toString(),
+    //
+    //   // employ metric rather than imperial units for all user I/O
+    //   "-metric",
+    //
+    //   // modify default range for -c or -L (miles/kilometers)
+    //   "-R",
+    //   config.simulationOptions.maxRange.toString(),
+    //
+    //   // display smooth rather than quantized contour levels
+    //   "-sc",
+    //
+    //   // ground clutter height (feet/meters)
+    //   "-gc",
+    //   config.environment.clutterHeight.toString(),
+    //
+    //   // display greyscale topography as white in .ppm files
+    //   "-ngs",
+    //
+    //   // do not produce unnecessary site or obstruction reports
+    //   "-N",
+    //
+    //   // filename of topographic map to generate (.ppm)
+    //   "-o",
+    //   "output.ppm",
+    //
+    //   // plot signal power level contours rather than field strength
+    //   "-dbm",
+    //
+    //   // threshold beyond which contours will not be displayed
+    //   "-db",
+    //   config.display.minimumSignal.toString(),
+    //
+    //   // generate Google Earth (.kml) compatible output
+    //   "-kml",
+    //
+    //   // invoke Longley-Rice rather than the default ITWOM model
+    //   "-olditm",
+    //
+    //   // sdf file directory path (overrides path in ~/.splat_path file)
+    //   "-d",
+    //   `/idbfs/${source}`,
+    // ])
 
-    // employ metric rather than imperial units for all user I/O
-    "-metric",
+    const raster = parsePpm(
+      await (await fetch("http://localhost:5173/output.ppm")).bytes(),
+    )
 
-    // modify default range for -c or -L (miles/kilometers)
-    "-R",
-    (config.simulationOptions.maxRange * 1000).toString(),
-
-    // display smooth rather than quantized contour levels
-    "-sc",
-
-    // ground clutter height (feet/meters)
-    "-gc",
-    config.environment.clutterHeight.toString(),
-
-    // display greyscale topography as white in .ppm files
-    "-ngs",
-
-    // do not produce unnecessary site or obstruction reports
-    "-N",
-
-    // filename of topographic map to generate (.ppm)
-    "-o",
-    "output.ppm",
-
-    // plot signal power level contours rather than field strength
-    "-dbm",
-
-    // threshold beyond which contours will not be displayed
-    "-db",
-    config.display.minimumSignal.toString(),
-
-    // generate Google Earth (.kml) compatible output
-    "-kml",
-
-    // invoke Longley-Rice rather than the default ITWOM model
-    "-olditm",
-
-    // sdf file directory path (overrides path in ~/.splat_path file)
-    "-d",
-    `/idbfs/${source}`,
-  ]
-  console.log({ args })
-
-  mod.callMain([
-    // txsite.qth
-    "-t",
-    "tx.qth",
-
-    // plot path loss map of TX based on an RX at X feet/meters AGL
-    "-L",
-    config.receiver.heightAGL.toString(),
-
-    // employ metric rather than imperial units for all user I/O
-    "-metric",
-
-    // modify default range for -c or -L (miles/kilometers)
-    "-R",
-    (config.simulationOptions.maxRange * 1000).toString(),
-
-    // display smooth rather than quantized contour levels
-    "-sc",
-
-    // ground clutter height (feet/meters)
-    "-gc",
-    config.environment.clutterHeight.toString(),
-
-    // display greyscale topography as white in .ppm files
-    "-ngs",
-
-    // do not produce unnecessary site or obstruction reports
-    "-N",
-
-    // filename of topographic map to generate (.ppm)
-    "-o",
-    "output.ppm",
-
-    // plot signal power level contours rather than field strength
-    "-dbm",
-
-    // threshold beyond which contours will not be displayed
-    "-db",
-    config.display.minimumSignal.toString(),
-
-    // generate Google Earth (.kml) compatible output
-    "-kml",
-
-    // invoke Longley-Rice rather than the default ITWOM model
-    "-olditm",
-
-    // sdf file directory path (overrides path in ~/.splat_path file)
-    "-d",
-    `/idbfs/${source}`,
-  ])
-
-  console.log({
-    idbfs: mod.FS.readdir("/idbfs"),
-    aws: mod.FS.readdir("/idbfs/aws"),
-    fasma: mod.FS.readdir("/idbfs/fasma"),
-  })
-
-  return {
-    bounds: getKmlBounds(mod),
-    config,
+    return {
+      bounds: await getKmlBounds(mod),
+      config,
+      raster,
+      dataUrl: toDataUrl(raster),
+    }
+  } finally {
+    mod.FS.unmount("/idbfs")
   }
 }
 
@@ -439,8 +527,6 @@ export async function generateSplatInputs(mod: MainModule, config: IConfig) {
     "",
   ].join("\n")
 
-  console.log({ tx })
-
   mod.FS.writeFile("tx.qth", tx)
 
   const climate = radioClimateMap.get(config.environment.radioClimate)
@@ -451,24 +537,6 @@ export async function generateSplatInputs(mod: MainModule, config: IConfig) {
   if (polarization === undefined) {
     throw new Error("Undefined value for polarization")
   }
-
-  const lrp_data = [
-    config.environment.groundDielectric.toFixed(3),
-    config.environment.groundConductivity.toFixed(6),
-    config.environment.atmosphericBending.toFixed(3),
-    config.transmitter.frequency.toFixed(3),
-    climate.toString(),
-    polarization.toString(),
-    (config.simulationOptions.simulationFraction / 100).toFixed(2),
-    (config.simulationOptions.timeFraction / 100).toFixed(2),
-    calculateErpWatts(
-      config.transmitter.power,
-      config.transmitter.antennaGain,
-      config.receiver.cableLoss,
-    ).toFixed(2),
-    "",
-  ].join("\n")
-  console.log({ lrp_data })
 
   mod.FS.writeFile(
     "splat.lrp",
@@ -506,7 +574,6 @@ export async function generateSplatInputs(mod: MainModule, config: IConfig) {
     .concat("")
     .join("\n")
 
-  console.log({ ssa })
   mod.FS.writeFile("splat.dcf", ssa)
   await awaitableSyncfs(mod, false)
 }
@@ -519,11 +586,16 @@ function calculateErpWatts(
   return 10 ** ((txPower + txGain - systemLoss - 30) / 10)
 }
 
-export function getKmlBounds(mod: MainModule): Bounds {
+export async function getKmlBounds(_mod: MainModule): Promise<Bounds> {
   const doc = new DOMParser().parseFromString(
-    mod.FS.readFile("output.kml", { encoding: "utf8" }) as unknown as string,
+    await (await fetch("http://localhost:5173/output.kml")).text(),
     "text/xml",
   )
+
+  // const doc = new DOMParser().parseFromString(
+  //   mod.FS.readFile("output.kml", { encoding: "utf8" }) as unknown as string,
+  //   "text/xml",
+  // )
 
   return {
     north: Number.parseFloat(doc.getElementsByTagName("north")[0].textContent),

@@ -8,6 +8,8 @@ export type Bounds = {
 }
 
 export type Result = {
-  config: IConfig
   bounds: Bounds
+  config: IConfig
+  raster: ImageData
+  dataUrl: string
 }

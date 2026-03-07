@@ -1,5 +1,12 @@
 import { useAtom } from "jotai"
-import { MapContainer, Marker, Popup, TileLayer } from "react-leaflet"
+import { LatLngBounds } from "leaflet"
+import {
+  ImageOverlay,
+  MapContainer,
+  Marker,
+  Popup,
+  TileLayer,
+} from "react-leaflet"
 import { configAtom, resultsAtom } from "./atoms"
 
 import "leaflet/dist/leaflet.css"
@@ -19,20 +26,34 @@ export default function MapWidget() {
   return (
     <div id="map-wrapper">
       <MapContainer id="map" {...mapOptions}>
-        <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
-        {results.map((result) => {
+        {results.map(({ config, dataUrl, bounds }) => {
           return (
-            <Marker
-              key={result.config.siteName}
-              position={[
-                result.config.transmitter.latitude,
-                result.config.transmitter.longitude,
-              ]}
-            >
-              <Popup>{result.config.siteName}</Popup>
-            </Marker>
+            <>
+              <Marker
+                key={config.siteName}
+                position={[
+                  config.transmitter.latitude,
+                  config.transmitter.longitude,
+                ]}
+              >
+                <Popup>{config.siteName}</Popup>
+              </Marker>
+              <ImageOverlay
+                key={config.siteName}
+                bounds={
+                  new LatLngBounds(
+                    [bounds.south, bounds.west],
+                    [bounds.north, bounds.east],
+                  )
+                }
+                url={dataUrl}
+                opacity={0.5}
+                zIndex={10}
+              />
+            </>
           )
         })}
+        <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
       </MapContainer>
     </div>
   )
