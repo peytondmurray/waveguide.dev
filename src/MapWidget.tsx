@@ -7,14 +7,33 @@ import {
   Marker,
   Popup,
   TileLayer,
+  useMapEvent,
 } from "react-leaflet"
 import { activeAtom, configAtom, resultsAtom } from "./atoms"
 
 import "leaflet/dist/leaflet.css"
 import "./MapWidget.css"
 
+function MapClickHandleComponent() {
+  const [config, setConfig] = useAtom(configAtom)
+  const map = useMapEvent("click", (e) => {
+    setConfig({
+      ...config,
+      transmitter: {
+        ...config.transmitter,
+        latitude: e.latlng.lat,
+        longitude: e.latlng.lng,
+      },
+    })
+    map.flyTo(e.latlng, map.getZoom())
+  })
+  return null
+}
+
 export default function MapWidget() {
   const [config, _setConfig] = useAtom(configAtom)
+  const [results, _setResults] = useAtom(resultsAtom)
+  const [active, setActive] = useAtom(activeAtom)
   const mapOptions = {
     center: [config.transmitter.latitude, config.transmitter.longitude],
     zoom: 13,
@@ -22,12 +41,13 @@ export default function MapWidget() {
     minZoom: 5,
   }
 
-  const [results, _setResults] = useAtom(resultsAtom)
-  const [active, setActive] = useAtom(activeAtom)
-
   return (
     <div id="map-wrapper">
       <MapContainer id="map" {...mapOptions}>
+        <MapClickHandleComponent />
+        <Marker
+          position={[config.transmitter.latitude, config.transmitter.longitude]}
+        />
         {results.map(({ config, dataUrl, bounds }) => {
           return (
             <React.Fragment key={config.siteName}>

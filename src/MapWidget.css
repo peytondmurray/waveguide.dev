@@ -8,3 +8,7 @@
   height: 100%;
   z-index: 0;
 }
+
+#map img.leaflet-marker-icon:first-of-type {
+  filter: hue-rotate(240deg);
+}
