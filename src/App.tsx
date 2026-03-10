@@ -1,3 +1,4 @@
+/// <reference types="vite-plugin-svgr/client" />
 import { AppShell, Burger, Group, MantineProvider } from "@mantine/core"
 import { useDisclosure } from "@mantine/hooks"
 import { useEffect, useState } from "react"

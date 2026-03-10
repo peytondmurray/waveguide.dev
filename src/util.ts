@@ -126,7 +126,9 @@ function parsePpm(arr: Uint8Array): ImageData {
       "Height and width of the splat output doesn't match the image pixel array size.",
     )
   }
-  return new ImageData(cmap, width, height, { pixelFormat: "rgba-unorm8" })
+
+  // No idea why tsc thinks this isn't valid, but we coerce the type here to make it okay
+  return new ImageData(cmap as Uint8ClampedArray<ArrayBuffer>, width, height)
 }
 
 /**

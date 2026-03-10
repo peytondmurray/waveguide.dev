@@ -35,12 +35,6 @@ export default function MapWidget() {
   const [config, _setConfig] = useAtom(configAtom)
   const [results, _setResults] = useAtom(resultsAtom)
   const [active, setActive] = useAtom(activeAtom)
-  const mapOptions = {
-    center: [config.transmitter.latitude, config.transmitter.longitude],
-    zoom: 13,
-    maxZoom: 18,
-    minZoom: 5,
-  }
 
   function handleMarkerClick(conf: IConfig) {
     // setActive(conf.siteName === active ? null : conf.siteName)
@@ -50,7 +44,13 @@ export default function MapWidget() {
 
   return (
     <div id="map-wrapper">
-      <MapContainer id="map" {...mapOptions}>
+      <MapContainer
+        id="map"
+        zoom={13}
+        maxZoom={18}
+        minZoom={5}
+        center={[config.transmitter.latitude, config.transmitter.longitude]}
+      >
         <MapClickHandleComponent />
         <Marker
           position={[config.transmitter.latitude, config.transmitter.longitude]}
