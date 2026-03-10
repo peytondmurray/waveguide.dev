@@ -13,3 +13,14 @@
 .mantine-AppShell-main {
   height: 100vh;
 }
+
+#logoArea > svg {
+  width: auto;
+  height: 60%;
+  margin: 0.5em 0em 0.5em 1em;
+}
+
+svg > g > path {
+  stroke: var(--mantine-color-text) !important;
+  stroke-width: 2em !important;
+}

@@ -26,6 +26,7 @@ export default function Navbar({ handleRun }: { handleRun: () => void }) {
   function startRun() {
     if (validSiteName) {
       handleRun()
+      console.log("Running! ", { config })
     }
   }
 

@@ -1,8 +1,9 @@
-import { AppShell, Burger, MantineProvider } from "@mantine/core"
+import { AppShell, Burger, Group, MantineProvider } from "@mantine/core"
 import { useDisclosure } from "@mantine/hooks"
 import { useEffect, useState } from "react"
 import Splat, { type MainModule } from "splat-web/splat"
 import Srtm2sdf from "splat-web/srtm2sdf"
+import Icon from "./logo.svg?react"
 import MapWidget from "./MapWidget"
 import Navbar from "./Navbar"
 import { downloadTiles, generateSplatInputs, runSplat } from "./util"
@@ -44,6 +45,7 @@ export default function App() {
       setActive(config.siteName)
     }
   }
+  const [active, _setActive] = useAtom(activeAtom)
 
   return (
     <MantineProvider defaultColorScheme="dark">
@@ -58,10 +60,11 @@ export default function App() {
       >
         <AppShell.Header>
           <Burger opened={opened} onClick={toggle} hiddenFrom="sm" size="sm" />
-
-          <div id="logoArea">
+          <Group id="logoArea" align="flex-start">
+            <Icon />
             <h1 id="title">waveguide.dev</h1>
-          </div>
+            <h2>{active}</h2>
+          </Group>
         </AppShell.Header>
 
         <AppShell.Navbar>

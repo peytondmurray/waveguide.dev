@@ -1,0 +1,63 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!-- Created with Inkscape (http://www.inkscape.org/) -->
+
+<svg
+   width="167.07913mm"
+   height="148.57251mm"
+   viewBox="0 0 167.07914 148.57251"
+   version="1.1"
+   id="svg1"
+   inkscape:version="1.4.3 (0d15f75042, 2025-12-25)"
+   sodipodi:docname="logo.svg"
+   xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
+   xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
+   xmlns="http://www.w3.org/2000/svg"
+   xmlns:svg="http://www.w3.org/2000/svg">
+  <sodipodi:namedview
+     id="namedview1"
+     pagecolor="#ffffff"
+     bordercolor="#000000"
+     borderopacity="0.25"
+     inkscape:showpageshadow="2"
+     inkscape:pageopacity="0.0"
+     inkscape:pagecheckerboard="0"
+     inkscape:deskcolor="#d1d1d1"
+     inkscape:document-units="mm"
+     inkscape:zoom="1.0667571"
+     inkscape:cx="694.1599"
+     inkscape:cy="83.899137"
+     inkscape:window-width="2854"
+     inkscape:window-height="1724"
+     inkscape:window-x="0"
+     inkscape:window-y="0"
+     inkscape:window-maximized="1"
+     inkscape:current-layer="layer1"
+     showgrid="false" />
+  <defs
+     id="defs1" />
+  <g
+     inkscape:label="Layer 1"
+     inkscape:groupmode="layer"
+     id="layer1"
+     transform="translate(-24.665492,-90.310873)">
+    <path
+       sodipodi:type="star"
+       style="fill:none;stroke:#000000;stroke-width:6.40633;stroke-dasharray:none"
+       id="path1"
+       inkscape:flatsided="false"
+       sodipodi:sides="3"
+       sodipodi:cx="45.500324"
+       sodipodi:cy="80.249512"
+       sodipodi:r1="149.9727"
+       sodipodi:r2="74.986343"
+       sodipodi:arg1="0.51978124"
+       sodipodi:arg2="1.5669788"
+       inkscape:rounded="0"
+       inkscape:randomized="0"
+       d="m 175.66581,154.7395 -129.879224,0.49581 -129.879223,0.49583 64.510225,-112.726617 64.510212,-112.72662 65.369,112.2308 z"
+       inkscape:transform-center-x="-0.17658421"
+       inkscape:transform-center-y="23.538757"
+       transform="matrix(0.61685944,0,0,-0.63199797,79.953625,190.7704)"
+       inkscape:label="path1" />
+  </g>
+</svg>

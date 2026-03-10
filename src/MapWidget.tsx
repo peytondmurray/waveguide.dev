@@ -13,6 +13,7 @@ import { activeAtom, configAtom, resultsAtom } from "./atoms"
 
 import "leaflet/dist/leaflet.css"
 import "./MapWidget.css"
+import type { IConfig } from "./config"
 
 function MapClickHandleComponent() {
   const [config, setConfig] = useAtom(configAtom)
@@ -41,6 +42,12 @@ export default function MapWidget() {
     minZoom: 5,
   }
 
+  function handleMarkerClick(conf: IConfig) {
+    // setActive(conf.siteName === active ? null : conf.siteName)
+    setActive(conf.siteName)
+    console.log({ conf })
+  }
+
   return (
     <div id="map-wrapper">
       <MapContainer id="map" {...mapOptions}>
@@ -48,34 +55,31 @@ export default function MapWidget() {
         <Marker
           position={[config.transmitter.latitude, config.transmitter.longitude]}
         />
-        {results.map(({ config, dataUrl, bounds }) => {
+        {results.map((result) => {
           return (
-            <React.Fragment key={config.siteName}>
+            <React.Fragment key={result.config.siteName}>
               <Marker
-                key={`${config.siteName}-marker`}
+                key={`${result.config.siteName}-marker`}
                 position={[
-                  config.transmitter.latitude,
-                  config.transmitter.longitude,
+                  result.config.transmitter.latitude,
+                  result.config.transmitter.longitude,
                 ]}
                 eventHandlers={{
-                  click: () =>
-                    setActive(
-                      config.siteName === active ? null : config.siteName,
-                    ),
+                  click: () => handleMarkerClick(result.config),
                 }}
               >
-                <Popup>{config.siteName}</Popup>
+                <Popup>{result.config.siteName}</Popup>
               </Marker>
               <ImageOverlay
-                key={`${config.siteName}-overlay`}
+                key={`${result.config.siteName}-overlay`}
                 bounds={
                   new LatLngBounds(
-                    [bounds.south, bounds.west],
-                    [bounds.north, bounds.east],
+                    [result.bounds.south, result.bounds.west],
+                    [result.bounds.north, result.bounds.east],
                   )
                 }
-                url={dataUrl}
-                opacity={config.siteName === active ? 0.7 : 0}
+                url={result.dataUrl}
+                opacity={result.config.siteName === active ? 0.7 : 0}
                 zIndex={10}
               />
             </React.Fragment>

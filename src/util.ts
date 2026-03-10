@@ -299,36 +299,35 @@ export async function downloadTiles(
   progressCallback({ value: 0, label: "Downloading tiles..." })
   const tiles = listTiles(lat, long, maxRange, source)
 
+  const tilesNeeded = tiles.filter(({ sdfName }) => {
+    return !mod.FS.analyzePath(`/idbfs/${source}/${sdfName}`, true).exists
+  })
+
   // Download and convert all the .hgt.{gz,zip} -> .sdf. Persist .hgt so that downloads only need to
   // happen as needed
   await Promise.all(
-    tiles
-      .filter(
-        ({ sdfName }) =>
-          !mod.FS.analyzePath(`/idbfs/${source}/${sdfName}`, true).exists,
-      )
-      .map(async ({ filename, url, sdfName }) => {
-        let response: Response
+    tilesNeeded.map(async ({ filename, url, sdfName }) => {
+      let response: Response
 
-        if (mod.FS.analyzePath(`/idbfs/${source}/${filename}`, true).exists) {
-          // If the .hgt.gz exists in the filesystem already, read it as a blob
+      if (mod.FS.analyzePath(`/idbfs/${source}/${filename}`, true).exists) {
+        // If the .hgt.gz exists in the filesystem already, read it as a blob
 
-          const contents = mod.FS.readFile(`/idbfs/${source}/${filename}`, {
-            encoding: "binary",
-          })
-          const blob = new Blob([contents])
-          response = new Response(blob)
-        } else {
-          // Otherwise fetch it from AWS
-          response = await fetch(url)
-        }
-        await hgtToSdf(mod, filename, sdfName, await response.blob(), source)
-        done++
-        progressCallback({
-          value: done / tiles.length,
-          label: "Downloading tiles...",
+        const contents = mod.FS.readFile(`/idbfs/${source}/${filename}`, {
+          encoding: "binary",
         })
-      }),
+        const blob = new Blob([contents])
+        response = new Response(blob)
+      } else {
+        // Otherwise fetch it from AWS
+        response = await fetch(url)
+      }
+      await hgtToSdf(mod, filename, sdfName, await response.blob(), source)
+      done++
+      progressCallback({
+        value: (100 * done) / tilesNeeded.length, // Mantine progress bar takes a percentage
+        label: "Downloading tiles...",
+      })
+    }),
   )
 
   await awaitableSyncfs(mod, false)
@@ -400,7 +399,7 @@ async function hgtToSdf(
 export async function runSplat(
   mod: MainModule,
   config: IConfig,
-  _source: "aws" | "fasma",
+  source: "aws" | "fasma",
 ): Promise<Result> {
   console.log("Syncing the IDBFS filesystem...")
   // Mount the IDBFS filesystem to persist the tiles; sync the IDBFS to the emscripten filesystem
@@ -414,60 +413,62 @@ export async function runSplat(
   try {
     console.log("Running splat...")
 
-    // mod.callMain([
-    //   // txsite.qth
-    //   "-t",
-    //   "tx.qth",
-    //
-    //   // plot path loss map of TX based on an RX at X feet/meters AGL
-    //   "-L",
-    //   config.receiver.heightAGL.toString(),
-    //
-    //   // employ metric rather than imperial units for all user I/O
-    //   "-metric",
-    //
-    //   // modify default range for -c or -L (miles/kilometers)
-    //   "-R",
-    //   config.simulationOptions.maxRange.toString(),
-    //
-    //   // display smooth rather than quantized contour levels
-    //   "-sc",
-    //
-    //   // ground clutter height (feet/meters)
-    //   "-gc",
-    //   config.environment.clutterHeight.toString(),
-    //
-    //   // display greyscale topography as white in .ppm files
-    //   "-ngs",
-    //
-    //   // do not produce unnecessary site or obstruction reports
-    //   "-N",
-    //
-    //   // filename of topographic map to generate (.ppm)
-    //   "-o",
-    //   "output.ppm",
-    //
-    //   // plot signal power level contours rather than field strength
-    //   "-dbm",
-    //
-    //   // threshold beyond which contours will not be displayed
-    //   "-db",
-    //   config.display.minimumSignal.toString(),
-    //
-    //   // generate Google Earth (.kml) compatible output
-    //   "-kml",
-    //
-    //   // invoke Longley-Rice rather than the default ITWOM model
-    //   "-olditm",
-    //
-    //   // sdf file directory path (overrides path in ~/.splat_path file)
-    //   "-d",
-    //   `/idbfs/${source}`,
-    // ])
+    mod.callMain([
+      // txsite.qth
+      "-t",
+      "tx.qth",
 
-    const raster = parsePpm(
-      await (await fetch("http://localhost:5173/output.ppm")).bytes(),
-    )
+      // plot path loss map of TX based on an RX at X feet/meters AGL
+      "-L",
+      config.receiver.heightAGL.toString(),
+
+      // employ metric rather than imperial units for all user I/O
+      "-metric",
+
+      // modify default range for -c or -L (miles/kilometers)
+      "-R",
+      config.simulationOptions.maxRange.toString(),
+
+      // display smooth rather than quantized contour levels
+      "-sc",
+
+      // ground clutter height (feet/meters)
+      "-gc",
+      config.environment.clutterHeight.toString(),
+
+      // display greyscale topography as white in .ppm files
+      "-ngs",
+
+      // do not produce unnecessary site or obstruction reports
+      "-N",
+
+      // filename of topographic map to generate (.ppm)
+      "-o",
+      "output.ppm",
+
+      // plot signal power level contours rather than field strength
+      "-dbm",
+
+      // threshold beyond which contours will not be displayed
+      "-db",
+      config.display.minimumSignal.toString(),
+
+      // generate Google Earth (.kml) compatible output
+      "-kml",
+
+      // invoke Longley-Rice rather than the default ITWOM model
+      "-olditm",
+
+      // sdf file directory path (overrides path in ~/.splat_path file)
+      "-d",
+      `/idbfs/${source}`,
+    ])
+
+    const raster = parsePpm(mod.FS.readFile("output.ppm"))
+
+    // const raster = parsePpm(
+    //   await (await fetch("http://localhost:5173/output.ppm")).bytes(),
+    // )
 
     return {
       bounds: await getKmlBounds(mod),
