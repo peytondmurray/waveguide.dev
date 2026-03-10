@@ -29,3 +29,10 @@ pnpm-workspace.yaml
 # Local Netlify folder
 .netlify
 public/
+
+# wrangler files
+.wrangler
+.dev.vars*
+!.dev.vars.example
+.env*
+!.env.example
