@@ -29,6 +29,6 @@ export async function onRequestGet(ctx) {
     }
   }
 
-  console.log(`Origin doesn't match valid origins: ${ctx.request}`)
+  console.log(`Origin doesn't match valid origins: ${origin}`)
   return new Response(null, { status: 404 })
 }
