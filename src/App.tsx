@@ -4,6 +4,7 @@ import { useDisclosure } from "@mantine/hooks"
 import { useEffect, useState } from "react"
 import Splat, { type MainModule } from "splat-web/splat"
 import Srtm2sdf from "splat-web/srtm2sdf"
+import { FSManager } from "./fsManager"
 import Icon from "./logo.svg?react"
 import MapWidget from "./MapWidget"
 import Navbar from "./Navbar"
@@ -13,38 +14,53 @@ import "@mantine/core/styles.css"
 
 import "./App.css"
 import { useAtom } from "jotai"
-import { activeAtom, configAtom, progressAtom, resultsAtom } from "./atoms"
+import {
+  activeAtom,
+  configAtom,
+  fsManagerAtom,
+  progressAtom,
+  resultsAtom,
+} from "./atoms"
 
 export default function App() {
   const [splatModule, setSplatModule] = useState<MainModule | null>(null)
   const [srtm2sdfModule, setSrtm2sdfModule] = useState<MainModule | null>(null)
+  const [config, _setConfig] = useAtom(configAtom)
+  const [_progress, setProgress] = useAtom(progressAtom)
+  const [opened, { toggle }] = useDisclosure()
+  const [results, setResults] = useAtom(resultsAtom)
+  const [_active, setActive] = useAtom(activeAtom)
+  const [fsManager, setFsManager] = useAtom(fsManagerAtom)
 
   useEffect(() => {
     Splat({ noInitialRun: true }).then((mod) => setSplatModule(mod))
     Srtm2sdf({ noInitialRun: true }).then((mod) => setSrtm2sdfModule(mod))
   }, [])
 
-  const [config, _setConfig] = useAtom(configAtom)
-  const [_progress, setProgress] = useAtom(progressAtom)
-  const [opened, { toggle }] = useDisclosure()
-  const [results, setResults] = useAtom(resultsAtom)
-  const [_active, setActive] = useAtom(activeAtom)
+  useEffect(() => {
+    if (splatModule === null || srtm2sdfModule === null) {
+      return
+    }
+    setFsManager(new FSManager(splatModule, srtm2sdfModule))
+  }, [splatModule, srtm2sdfModule, setFsManager])
 
   async function handleRun() {
-    if (splatModule !== null && srtm2sdfModule !== null) {
-      await downloadTiles(
-        srtm2sdfModule,
-        config.transmitter.latitude,
-        config.transmitter.longitude,
-        config.simulationOptions.maxRange,
-        setProgress,
-        "fasma",
-      )
-
-      await generateSplatInputs(splatModule, config)
-      setResults([...results, await runSplat(splatModule, config, "fasma")])
-      setActive(config.siteName)
+    // If the wasm modules or the filesystem manager aren't ready, just exit early
+    if (splatModule === null || srtm2sdfModule === null || fsManager === null) {
+      return
     }
+
+    await downloadTiles(
+      fsManager,
+      config.transmitter.latitude,
+      config.transmitter.longitude,
+      config.simulationOptions.maxRange,
+      setProgress,
+    )
+
+    await generateSplatInputs(fsManager, splatModule, config)
+    setResults([...results, await runSplat(fsManager, splatModule, config)])
+    setActive(config.siteName)
   }
   const [active, _setActive] = useAtom(activeAtom)
 

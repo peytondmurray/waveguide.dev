@@ -1,14 +1,9 @@
-import { BlobReader, type FileEntry, ZipReader } from "@zip.js/zip.js"
 import type { MainModule } from "splat-web/splat"
 import { toCmap } from "./colormaps"
 import type { IConfig } from "./config"
+import type { FSManager } from "./fsManager"
 import type { Bounds, Result } from "./result"
-
-type Tile = {
-  filename: string
-  url: string
-  sdfName: string
-}
+import type { Tile } from "./tile"
 
 const radioClimateMap = new Map([
   ["equatorial", 1],
@@ -163,12 +158,7 @@ function radToDeg(rad: number): number {
  * @param maxRange - Range [m] of tiles to include from the starting latitude/longitude
  * @returns
  */
-function listTiles(
-  lat: number,
-  long: number,
-  maxRange: number,
-  source: "aws" | "fasma",
-): Tile[] {
+function listTiles(lat: number, long: number, maxRange: number): Tile[] {
   const rEarth = 6378.137
 
   const dphi = radToDeg(maxRange / rEarth)
@@ -196,21 +186,12 @@ function listTiles(
 
       const absPhi = Math.abs(phi).toFixed(0)
       const absLambda = Math.abs(lambda).toFixed(0)
-
-      let filename: string
-      let url: string
-      if (source === "aws") {
-        filename = `${ns}${absPhi}${ew}${absLambda}.hgt.gz`
-        url = `https://s3.amazonaws.com/elevation-tiles-prod/skadi/${ns}${absPhi}/${filename}`
-      } else {
-        filename = `${ns}${absPhi}${ew}${absLambda}.SRTMGL3S.hgt.zip`
-        // url = `https://srtm.fasma.org/${filename}`
-        url = `http://localhost:5173/${filename}`
-      }
-
+      const hgtname = `${ns}${absPhi}${ew}${absLambda}.SRTMGL3S.hgt`
+      const ziphgtname = `${hgtname}.zip`
       tiles.push({
-        filename,
-        url,
+        url: `https://waveguide.dev/elevation/${ziphgtname}`,
+        hgtname,
+        ziphgtname,
         sdfName: `${phi}:${phi + 1}:${longMin}:${longMax}.sdf`,
       })
     }
@@ -227,27 +208,6 @@ function clamp0to360(a: number): number {
   } else {
     return a
   }
-}
-
-/**
- * A version of FS.syncfs that you can await.
- *
- * See https://github.com/emscripten-core/emscripten/issues/18306#issuecomment-1502710013
- *
- * @param mod - Emscripten module whose filesystem is to be synced
- * @param b - If true, sync from IDBFS to MEMFS. If false, write MEMFS to IDBFS
- * @returns A promise that resolves when syncing is done
- */
-async function awaitableSyncfs(mod: MainModule, b: boolean): Promise<void> {
-  return new Promise((resolve, reject) => {
-    mod.FS.syncfs(b, (err: Error) => {
-      if (err) {
-        reject(err)
-      } else {
-        resolve()
-      }
-    })
-  })
 }
 
 /**
@@ -268,7 +228,7 @@ async function awaitableSyncfs(mod: MainModule, b: boolean): Promise<void> {
  * @param maxRange - Radius [m] around (lat, long) to include tiles from
  */
 export async function downloadTiles(
-  mod: MainModule,
+  fsManager: FSManager,
   lat: number,
   long: number,
   maxRange: number,
@@ -279,221 +239,91 @@ export async function downloadTiles(
     value: number
     label: string
   }) => void,
-  source: "aws" | "fasma",
 ) {
-  // Mount the IDBFS filesystem to persist the tiles; sync the IDBFS to the emscripten filesystem
-  // If this directory already exists, no need to remake it
-  if (!mod.FS.analyzePath("/idbfs", true).exists) {
-    mod.FS.mkdir("/idbfs")
-  }
-  mod.FS.mount(mod.IDBFS, {}, "/idbfs")
-  await awaitableSyncfs(mod, true)
-
-  // Generate the subdirectories for aws and fasma
-  if (!mod.FS.analyzePath("/idbfs/aws", true).exists) {
-    mod.FS.mkdir("/idbfs/aws")
-  }
-  if (!mod.FS.analyzePath("/idbfs/fasma", true).exists) {
-    mod.FS.mkdir("/idbfs/fasma")
-  }
-
-  let done = 0
   progressCallback({ value: 0, label: "Downloading tiles..." })
-  const tiles = listTiles(lat, long, maxRange, source)
-
-  const tilesNeeded = tiles.filter(({ sdfName }) => {
-    return !mod.FS.analyzePath(`/idbfs/${source}/${sdfName}`, true).exists
-  })
-
-  // Download and convert all the .hgt.{gz,zip} -> .sdf. Persist .hgt so that downloads only need to
-  // happen as needed
-  await Promise.all(
-    tilesNeeded.map(async ({ filename, url, sdfName }) => {
-      let response: Response
-
-      if (mod.FS.analyzePath(`/idbfs/${source}/${filename}`, true).exists) {
-        // If the .hgt.gz exists in the filesystem already, read it as a blob
-
-        const contents = mod.FS.readFile(`/idbfs/${source}/${filename}`, {
-          encoding: "binary",
-        })
-        const blob = new Blob([contents])
-        response = new Response(blob)
-      } else {
-        // Otherwise fetch it from AWS
-        response = await fetch(url)
-      }
-      await hgtToSdf(mod, filename, sdfName, await response.blob(), source)
-      done++
-      progressCallback({
-        value: (100 * done) / tilesNeeded.length, // Mantine progress bar takes a percentage
-        label: "Downloading tiles...",
-      })
-    }),
-  )
-
-  await awaitableSyncfs(mod, false)
-  mod.FS.unmount("/idbfs")
-}
-
-async function ungz(blob: Blob): Promise<Uint8Array> {
-  const decompressedStream = blob
-    .stream()
-    .pipeThrough(new DecompressionStream("gzip"))
-  const dBlob = await new Response(decompressedStream).blob()
-
-  return new Uint8Array(await dBlob.arrayBuffer())
-}
-
-async function unzip(blob: Blob): Promise<Uint8Array> {
-  // https://github.com/gildas-lormeau/zip.js
-  const zipFileReader = new BlobReader(blob)
-
-  const zipReader = new ZipReader(zipFileReader)
-  const firstEntry = (await zipReader.getEntries()).shift()
-  if (firstEntry === undefined) {
-    return new Uint8Array()
-  }
-  if (firstEntry.directory) {
-    throw new Error("Unrecognized format for .hgt.zip file.")
-  }
-  const buf = await (firstEntry as FileEntry).arrayBuffer()
-  await zipReader.close()
-
-  return new Uint8Array(buf)
-}
-
-function getSuffix(filename: string): string {
-  const splits = filename.split(".")
-  return splits[splits.length - 1]
-}
-
-// https://github.com/whatwg/compression/blob/main/explainer.md
-async function hgtToSdf(
-  mod: MainModule,
-  filename: string,
-  sdfName: string,
-  cBlob: Blob,
-  source: "aws" | "fasma",
-) {
-  let ab: Uint8Array
-  if (source === "aws") {
-    ab = await ungz(cBlob)
-  } else {
-    ab = await unzip(cBlob)
-  }
-
-  const ext = getSuffix(filename)
-  const decompressedHgtName = filename.substring(
-    0,
-    filename.length - ext.length,
-  )
-  const mountedHgtName = `/idbfs/${source}/${decompressedHgtName}`
-
-  mod.FS.writeFile(mountedHgtName, ab)
-  mod.callMain([mountedHgtName]) // <-- Writes back into the root of the FS
-
-  // Can't just rename between filesystems - need to copy the file contents instead
-  const content = mod.FS.readFile(sdfName, { encoding: "binary" })
-  mod.FS.writeFile(`/idbfs/${source}/${sdfName}`, content)
+  await fsManager.getSdfs(listTiles(lat, long, maxRange))
 }
 
 export async function runSplat(
+  fsManager: FSManager,
   mod: MainModule,
   config: IConfig,
-  source: "aws" | "fasma",
 ): Promise<Result> {
   console.log("Syncing the IDBFS filesystem...")
-  // Mount the IDBFS filesystem to persist the tiles; sync the IDBFS to the emscripten filesystem
-  // If this directory already exists, no need to remake it
-  if (!mod.FS.analyzePath("/idbfs", true).exists) {
-    mod.FS.mkdir("/idbfs")
-  }
-  mod.FS.mount(mod.IDBFS, {}, "/idbfs")
-  await awaitableSyncfs(mod, true)
+  fsManager.mountAndSync(mod)
 
-  try {
-    console.log("Running splat...")
+  console.log("Running splat...")
 
-    mod.callMain([
-      // txsite.qth
-      "-t",
-      "tx.qth",
+  mod.callMain([
+    // txsite.qth
+    "-t",
+    "tx.qth",
 
-      // plot path loss map of TX based on an RX at X feet/meters AGL
-      "-L",
-      config.receiver.heightAGL.toString(),
+    // plot path loss map of TX based on an RX at X feet/meters AGL
+    "-L",
+    config.receiver.heightAGL.toString(),
 
-      // employ metric rather than imperial units for all user I/O
-      "-metric",
+    // employ metric rather than imperial units for all user I/O
+    "-metric",
 
-      // modify default range for -c or -L (miles/kilometers)
-      "-R",
-      config.simulationOptions.maxRange.toString(),
+    // modify default range for -c or -L (miles/kilometers)
+    "-R",
+    config.simulationOptions.maxRange.toString(),
 
-      // display smooth rather than quantized contour levels
-      "-sc",
+    // display smooth rather than quantized contour levels
+    "-sc",
 
-      // ground clutter height (feet/meters)
-      "-gc",
-      config.environment.clutterHeight.toString(),
+    // ground clutter height (feet/meters)
+    "-gc",
+    config.environment.clutterHeight.toString(),
 
-      // display greyscale topography as white in .ppm files
-      "-ngs",
+    // display greyscale topography as white in .ppm files
+    "-ngs",
 
-      // do not produce unnecessary site or obstruction reports
-      "-N",
+    // do not produce unnecessary site or obstruction reports
+    "-N",
 
-      // filename of topographic map to generate (.ppm)
-      "-o",
-      "output.ppm",
+    // filename of topographic map to generate (.ppm)
+    "-o",
+    "output.ppm",
 
-      // plot signal power level contours rather than field strength
-      "-dbm",
+    // plot signal power level contours rather than field strength
+    "-dbm",
 
-      // threshold beyond which contours will not be displayed
-      "-db",
-      config.display.minimumSignal.toString(),
+    // threshold beyond which contours will not be displayed
+    "-db",
+    config.display.minimumSignal.toString(),
 
-      // generate Google Earth (.kml) compatible output
-      "-kml",
+    // generate Google Earth (.kml) compatible output
+    "-kml",
 
-      // invoke Longley-Rice rather than the default ITWOM model
-      "-olditm",
+    // invoke Longley-Rice rather than the default ITWOM model
+    "-olditm",
 
-      // sdf file directory path (overrides path in ~/.splat_path file)
-      "-d",
-      `/idbfs/${source}`,
-    ])
+    // sdf file directory path (overrides path in ~/.splat_path file)
+    "-d",
+    fsManager.idbfsMountPoint,
+  ])
 
-    const raster = parsePpm(mod.FS.readFile("output.ppm"))
+  const raster = parsePpm(
+    (await fsManager.readFile(mod, "output.ppm", {
+      encoding: "binary",
+    })) as Uint8Array,
+  )
 
-    // const raster = parsePpm(
-    //   await (await fetch("http://localhost:5173/output.ppm")).bytes(),
-    // )
-
-    return {
-      bounds: await getKmlBounds(mod),
-      config,
-      raster,
-      dataUrl: toDataUrl(raster),
-    }
-  } finally {
-    mod.FS.unmount("/idbfs")
+  return {
+    bounds: await getKmlBounds(fsManager, mod),
+    config,
+    raster,
+    dataUrl: toDataUrl(raster),
   }
 }
 
-export async function generateSplatInputs(mod: MainModule, config: IConfig) {
-  const tx = [
-    "tx",
-    config.transmitter.latitude.toFixed(6),
-    clamp0to360(360 - config.transmitter.longitude).toFixed(6),
-    config.transmitter.heightAGL.toFixed(2),
-    "",
-  ].join("\n")
-
-  mod.FS.writeFile("tx.qth", tx)
-
+export async function generateSplatInputs(
+  fsManager: FSManager,
+  mod: MainModule,
+  config: IConfig,
+) {
   const climate = radioClimateMap.get(config.environment.radioClimate)
   if (climate === undefined) {
     throw new Error("Undefined value for radio climate")
@@ -502,6 +332,15 @@ export async function generateSplatInputs(mod: MainModule, config: IConfig) {
   if (polarization === undefined) {
     throw new Error("Undefined value for polarization")
   }
+
+  const tx = [
+    "tx",
+    config.transmitter.latitude.toFixed(6),
+    clamp0to360(360 - config.transmitter.longitude).toFixed(6),
+    config.transmitter.heightAGL.toFixed(2),
+    "",
+  ].join("\n")
+  await fsManager.writeFile(mod, "tx.qth", tx, {})
 
   const lrp = [
     config.environment.groundDielectric.toFixed(3),
@@ -519,27 +358,8 @@ export async function generateSplatInputs(mod: MainModule, config: IConfig) {
     ).toFixed(2),
     "",
   ].join("\n")
-
-  mod.FS.writeFile("splat.lrp", lrp)
-
-  // const ssa = [
-  //   "; SPLAT! Auto-generated DBM Signal Level Color Definition",
-  //   ";",
-  //   "; Format: dBm: red, green, blue",
-  //   ";",
-  // ]
-  //   .concat(
-  //     toScaledStringArray(
-  //       config.display.colormap,
-  //       config.display.minimumSignal,
-  //       config.display.maximumSignal,
-  //     ),
-  //   )
-  //   .concat("")
-  //   .join("\n")
-  //
-  // mod.FS.writeFile("splat.dcf", ssa)
-  await awaitableSyncfs(mod, false)
+  await fsManager.writeFile(mod, "splat.lrp", lrp, {})
+  await fsManager.syncFS(mod, "MEMFS->IDBFS")
 }
 
 function calculateErpWatts(
@@ -550,16 +370,16 @@ function calculateErpWatts(
   return 10 ** ((txPower + txGain - systemLoss - 30) / 10)
 }
 
-export async function getKmlBounds(_mod: MainModule): Promise<Bounds> {
+export async function getKmlBounds(
+  fsManager: FSManager,
+  mod: MainModule,
+): Promise<Bounds> {
   const doc = new DOMParser().parseFromString(
-    await (await fetch("http://localhost:5173/output.kml")).text(),
+    (await fsManager.readFile(mod, "output.kml", {
+      encoding: "utf8",
+    })) as string,
     "text/xml",
   )
-
-  // const doc = new DOMParser().parseFromString(
-  //   mod.FS.readFile("output.kml", { encoding: "utf8" }) as unknown as string,
-  //   "text/xml",
-  // )
 
   return {
     north: Number.parseFloat(doc.getElementsByTagName("north")[0].textContent),
