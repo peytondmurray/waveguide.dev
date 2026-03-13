@@ -2,11 +2,13 @@ export async function onRequestGet(ctx) {
   const path = new URL(ctx.request.url).pathname.replace("/elevation/", "")
   const origin = ctx.request.headers.get("origin")
   if (origin === null) {
+    console.log(`Origin is null: ${ctx.request}`)
     return new Response(null, { status: 404 })
   }
 
   const file = await ctx.env.SRTMGL3S_BUCKET.get(path)
   if (!file) {
+    console.log(`File doesn't exist: ${ctx.request}`)
     return new Response(null, { status: 404 })
   }
 
@@ -27,5 +29,6 @@ export async function onRequestGet(ctx) {
     }
   }
 
+  console.log(`Origin doesn't match valid origins: ${ctx.request}`)
   return new Response(null, { status: 404 })
 }
