@@ -189,7 +189,7 @@ function listTiles(lat: number, long: number, maxRange: number): Tile[] {
       const hgtname = `${ns}${absPhi}${ew}${absLambda}.SRTMGL3S.hgt`
       const ziphgtname = `${hgtname}.zip`
       tiles.push({
-        url: `https://waveguide.dev/elevation/${ziphgtname}`,
+        url: `/elevation/${ziphgtname}`,
         hgtname,
         ziphgtname,
         sdfName: `${phi}:${phi + 1}:${longMin}:${longMax}.sdf`,

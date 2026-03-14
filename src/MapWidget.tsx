@@ -1,5 +1,5 @@
 import { useAtom } from "jotai"
-import { LatLngBounds } from "leaflet"
+import { LatLngBounds, type LeafletMouseEvent } from "leaflet"
 import React from "react"
 import {
   ImageOverlay,
@@ -17,7 +17,7 @@ import type { IConfig } from "./config"
 
 function MapClickHandleComponent() {
   const [config, setConfig] = useAtom(configAtom)
-  const map = useMapEvent("click", (e) => {
+  useMapEvent("click", (e) => {
     setConfig({
       ...config,
       transmitter: {
@@ -26,7 +26,6 @@ function MapClickHandleComponent() {
         longitude: e.latlng.lng,
       },
     })
-    map.flyTo(e.latlng, map.getZoom())
   })
   return null
 }
@@ -36,10 +35,9 @@ export default function MapWidget() {
   const [results, _setResults] = useAtom(resultsAtom)
   const [active, setActive] = useAtom(activeAtom)
 
-  function handleMarkerClick(conf: IConfig) {
-    // setActive(conf.siteName === active ? null : conf.siteName)
-    setActive(conf.siteName)
-    console.log({ conf })
+  function handleMarkerClick(event: LeafletMouseEvent, conf: IConfig) {
+    setActive(conf.siteName === active ? null : conf.siteName)
+    event.originalEvent.stopPropagation()
   }
 
   return (
@@ -65,7 +63,7 @@ export default function MapWidget() {
                   result.config.transmitter.longitude,
                 ]}
                 eventHandlers={{
-                  click: () => handleMarkerClick(result.config),
+                  click: (event) => handleMarkerClick(event, result.config),
                 }}
               >
                 <Popup>{result.config.siteName}</Popup>

@@ -8,11 +8,14 @@ export default defineConfig({
   optimizeDeps: {
     exclude: ["splat-web"],
   },
+  assetsInclude: ["**/*.wasm"],
   server: {
-    fs: {
-      // Allow serving files from the linked splat-web package
-      allow: [".."],
+    proxy: {
+      "/elevation": {
+        target: "https://waveguide.dev",
+        changeOrigin: true,
+        secure: true,
+      },
     },
   },
-  assetsInclude: ["**/*.wasm"],
 })
