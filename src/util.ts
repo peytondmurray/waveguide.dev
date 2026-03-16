@@ -340,6 +340,7 @@ export async function generateSplatInputs(
     config.transmitter.heightAGL.toFixed(2),
     "",
   ].join("\n")
+  console.log("tx.qth", { tx })
   await fsManager.writeFile(mod, "tx.qth", tx, {})
 
   const lrp = [
@@ -381,10 +382,12 @@ export async function getKmlBounds(
     "text/xml",
   )
 
-  return {
+  const result = {
     north: Number.parseFloat(doc.getElementsByTagName("north")[0].textContent),
     south: Number.parseFloat(doc.getElementsByTagName("south")[0].textContent),
     east: Number.parseFloat(doc.getElementsByTagName("east")[0].textContent),
     west: Number.parseFloat(doc.getElementsByTagName("west")[0].textContent),
   }
+  console.log("KML bounds:", { result })
+  return result
 }
