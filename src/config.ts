@@ -1,3 +1,5 @@
+import type { Colormap } from "./colormaps"
+
 interface IConfig {
   siteName: string
   transmitter: {
@@ -37,7 +39,7 @@ interface IConfig {
   display: {
     minimumSignal: number
     maximumSignal: number
-    colormap: "plasma" | "viridis"
+    colormap: Colormap
     transparency: number
   }
 }

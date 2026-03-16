@@ -177,7 +177,14 @@ const cm = new Map([
   ["inferno", inferno],
 ])
 
-export type colormap = "viridis" | "plasma" | "magma" | "cividis" | "inferno"
+export const Colormaps = [
+  "viridis",
+  "plasma",
+  "magma",
+  "cividis",
+  "inferno",
+] as const
+export type Colormap = (typeof Colormaps)[number]
 
 /**
  * Render a number as a string, left padded with zeroes.
@@ -218,7 +225,7 @@ function formatPM(n: number, l: number): string {
  *  ]
  */
 export function toScaledStringArray(
-  cmName: colormap,
+  cmName: Colormap,
   min: number,
   max: number,
 ): string[] {

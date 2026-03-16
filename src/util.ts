@@ -41,7 +41,7 @@ function nextNonSpaceByte(arr: Uint8Array, start: number): number {
   return i
 }
 
-function parsePpm(arr: Uint8Array): ImageData {
+function parsePpm(arr: Uint8Array, config: IConfig): ImageData {
   // P6\n2400 2400\n255\nRGB data, one byte after another. Spaces or newlines can be repeated.
 
   // Pass by the first 3 bytes: P6\n
@@ -114,8 +114,7 @@ function parsePpm(arr: Uint8Array): ImageData {
     throw new Error("Multibyte ppms not supported.")
   }
 
-  const cmap = toCmap(rgb, "magma", 0, maxval)
-
+  const cmap = toCmap(rgb, config.display.colormap, 0, maxval)
   if (height * width * 4 !== cmap.length) {
     throw new Error(
       "Height and width of the splat output doesn't match the image pixel array size.",
@@ -309,6 +308,7 @@ export async function runSplat(
     (await fsManager.readFile(mod, "output.ppm", {
       encoding: "binary",
     })) as Uint8Array,
+    config,
   )
 
   return {
