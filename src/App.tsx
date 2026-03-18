@@ -5,10 +5,10 @@ import { useEffect, useState } from "react"
 import Splat, { type MainModule } from "splat-web/splat"
 import Srtm2sdf from "splat-web/srtm2sdf"
 import { FSManager } from "./fsManager"
+import { downloadTiles, generateSplatInputs, runSplat } from "./geoutil"
 import Icon from "./logo.svg?react"
 import MapWidget from "./MapWidget"
 import Navbar from "./Navbar"
-import { downloadTiles, generateSplatInputs, runSplat } from "./util"
 
 import "@mantine/core/styles.css"
 

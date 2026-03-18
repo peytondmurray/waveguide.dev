@@ -1,3 +1,5 @@
+import { padNumber } from "./util"
+
 export const viridis = [
   [68, 1, 84],
   [70, 12, 95],
@@ -187,17 +189,6 @@ export const Colormaps = [
 export type Colormap = (typeof Colormaps)[number]
 
 /**
- * Render a number as a string, left padded with zeroes.
- *
- * @param n - Number to pad
- * @param l - Number of digits to left-pad to
- * @returns The left-padded number, as a string
- */
-function padNumber(n: number, l: number): string {
-  return `${n}`.padStart(l, " ")
-}
-
-/**
  * Format a number, left padded with spaces and including a sign (even for positive numbers).
  *
  * @param n - Number to display
@@ -206,9 +197,9 @@ function padNumber(n: number, l: number): string {
  */
 function formatPM(n: number, l: number): string {
   if (n >= 0) {
-    return `+${padNumber(n, l)}`
+    return `+${padNumber(n, l, " ")}`
   }
-  return `-${padNumber(-1 * n, l)}`
+  return `-${padNumber(-1 * n, l, " ")}`
 }
 
 /**
@@ -238,7 +229,7 @@ export function toScaledStringArray(
   }
 
   return cmap.map(([r, g, b], i) => {
-    return `${formatPM(linspace[i], 4)}: ${padNumber(r, 3)}, ${padNumber(g, 3)}, ${padNumber(b, 3)}`
+    return `${formatPM(linspace[i], 4)}: ${padNumber(r, 3, " ")}, ${padNumber(g, 3, " ")}, ${padNumber(b, 3, " ")}`
   })
 }
 
