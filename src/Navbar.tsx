@@ -12,6 +12,7 @@ import "./Navbar.css"
 
 import { useAtom } from "jotai"
 import { configAtom, progressAtom, resultsAtom } from "./atoms"
+import { Colormaps } from "./colormaps"
 import type { IConfig } from "./config"
 
 export default function Navbar({ handleRun }: { handleRun: () => void }) {
@@ -260,7 +261,7 @@ export default function Navbar({ handleRun }: { handleRun: () => void }) {
         <Group grow gap="1em">
           <Select
             label="Colormap"
-            data={makeLabeledValues(["Plasma", "Viridis"])}
+            data={makeLabeledValues(Colormaps as unknown as string[])}
             value={config.display.colormap}
             onChange={(value) => {
               if (value !== null) {
