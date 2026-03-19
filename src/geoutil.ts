@@ -1,5 +1,7 @@
+import type GeoTIFF from "geotiff"
+import { fromArrayBuffer, writeArrayBuffer } from "geotiff"
 import type { MainModule } from "splat-web/splat"
-import { toCmap } from "./colormaps"
+import { rgbToY, toCmap } from "./colormaps"
 import type { IConfig } from "./config"
 import type { FSManager } from "./fsManager"
 import type { Bounds, Result } from "./result"
@@ -43,7 +45,53 @@ function nextNonSpaceByte(arr: Uint8Array, start: number): number {
   return i
 }
 
-function parsePpm(arr: Uint8Array, config: IConfig): ImageData {
+async function createGeoTiff(
+  data: Uint8ClampedArray,
+  width: number,
+  height: number,
+  bounds: {
+    north: number
+    south: number
+    east: number
+    west: number
+  },
+): Promise<GeoTIFF> {
+  const ab = writeArrayBuffer(data as unknown as number[], {
+    height,
+    width,
+    BitsPerSample: [8],
+    SamplesPerPixel: 1,
+    ModelPixelScale: [
+      (bounds.east - bounds.west) / width,
+      (bounds.north - bounds.south) / height,
+      0,
+    ],
+    ModelTiepoint: [0, 0, 0, bounds.west, bounds.north, 0],
+    GeographicTypeGeoKey: 3857,
+  })
+
+  return await fromArrayBuffer(ab)
+}
+
+async function parsePpm(
+  arr: Uint8Array,
+  config: IConfig,
+  bounds: {
+    north: number
+    south: number
+    east: number
+    west: number
+  },
+): Promise<{
+  imageData: ImageData
+  bounds: {
+    north: number
+    south: number
+    east: number
+    west: number
+  }
+}> {
+  // ): Promise<ImageData> {
   // P6\n2400 2400\n255\nRGB data, one byte after another. Spaces or newlines can be repeated.
 
   // Pass by the first 3 bytes: P6\n
@@ -116,15 +164,32 @@ function parsePpm(arr: Uint8Array, config: IConfig): ImageData {
     throw new Error("Multibyte ppms not supported.")
   }
 
-  const cmap = toCmap(rgb, config.display.colormap, 0, maxval)
-  if (height * width * 4 !== cmap.length) {
-    throw new Error(
-      "Height and width of the splat output doesn't match the image pixel array size.",
-    )
+  const tiff = await createGeoTiff(rgbToY(rgb), width, height, bounds)
+  const img = await tiff.getImage()
+  const rasterData = await img.readRasters()
+  const w = rasterData.width
+  const h = rasterData.height
+  const bbox = img.getBoundingBox()
+  const newBounds = {
+    west: bbox[0],
+    south: bbox[1],
+    east: bbox[2],
+    north: bbox[3],
   }
+  const values = rasterData[0] as unknown as Uint8ClampedArray
 
   // No idea why tsc thinks this isn't valid, but we coerce the type here to make it okay
-  return new ImageData(cmap as Uint8ClampedArray<ArrayBuffer>, width, height)
+  const rgba = toCmap(
+    values,
+    config.display.colormap,
+    0,
+    maxval,
+  ) as Uint8ClampedArray<ArrayBuffer>
+
+  return {
+    imageData: new ImageData(rgba, w, h),
+    bounds: newBounds,
+  }
 }
 
 /**
@@ -276,18 +341,21 @@ export async function runSplat(
     fsManager.idbfsMountPoint,
   ])
 
-  const raster = parsePpm(
+  const kmlBounds = await getKmlBounds(fsManager, mod)
+
+  const { imageData, bounds } = await parsePpm(
     (await fsManager.readFile(mod, "output.ppm", {
       encoding: "binary",
     })) as Uint8Array,
     config,
+    kmlBounds,
   )
 
   return {
-    bounds: await getKmlBounds(fsManager, mod),
+    bounds,
     config,
-    raster,
-    dataUrl: toDataUrl(raster),
+    raster: imageData,
+    dataUrl: toDataUrl(imageData),
   }
 }
 

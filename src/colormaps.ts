@@ -234,7 +234,7 @@ export function toScaledStringArray(
 }
 
 // https://en.wikipedia.org/wiki/SRGB#Transfer_function_(%22gamma%22)
-function rgbToLin(val: number) {
+export function rgbToLin(val: number) {
   // Send this function a decimal sRGB gamma encoded color value
   // between 0.0 and 1.0, and it returns a linearized value.
   if (val <= 0.04045) {
@@ -257,7 +257,7 @@ function rgbToYaPixel(rgb: Uint8ClampedArray): number {
   )
 }
 
-function rgbToY(rgb: Uint8ClampedArray): Uint8ClampedArray {
+export function rgbToY(rgb: Uint8ClampedArray): Uint8ClampedArray {
   const nPixels = rgb.length / 3
   const ya = new Uint8ClampedArray(nPixels)
   for (let i = 0; i < nPixels; i++) {
@@ -319,7 +319,7 @@ function cmapInterpolate(cmap: number[][], value: number): number[] {
 }
 
 /**
- * @param rgb - RGB data from a ppm file. Colormapped to whatever splat uses by default
+ * @param Y - Luminance data
  * @param name - Name of the colormap to use for plotting
  * @param minval - Value the minimum of the colormap should be associated to
  * @param maxval - Value the maximum of the colormap should be associated to
@@ -327,13 +327,11 @@ function cmapInterpolate(cmap: number[][], value: number): number[] {
  *  set to be transparent
  */
 export function toCmap(
-  rgb: Uint8ClampedArray,
+  Y: Uint8ClampedArray,
   name: string,
   minval: number,
   maxval: number,
 ): Uint8ClampedArray {
-  const Y = rgbToY(rgb)
-
   const cmapData = cm.get(name)
   if (cmapData === undefined) {
     throw new Error(`No colormap exists named ${name}. Aborting.`)
@@ -341,7 +339,7 @@ export function toCmap(
   const step = (maxval - minval) / (cmapData.length - 1)
   const mappedCmap = cmapData.map((tup, i) => [minval + i * step, ...tup])
 
-  const result = new Uint8ClampedArray((4 * rgb.length) / 3)
+  const result = new Uint8ClampedArray(4 * Y.length)
   let i = 0
   for (const val of Y) {
     const [r, g, b] = cmapInterpolate(mappedCmap, val)
