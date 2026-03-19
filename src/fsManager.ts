@@ -147,7 +147,9 @@ export class FSManager {
         if (!this.splatMod.FS.analyzePath(zipHgtPath, true).exists) {
           const response = await fetch(tile.url)
           if (!response.ok) {
-            throw new Error(await response.text())
+            throw new Error(
+              `Tried to fetch ${tile.url}, but failed. Reason: ${await response.text()}`,
+            )
           }
 
           const blob = await response.blob()

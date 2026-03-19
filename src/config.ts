@@ -47,11 +47,11 @@ interface IConfig {
 const DefaultConfig: IConfig = {
   siteName: "default",
   transmitter: {
-    latitude: 40,
-    longitude: -108,
+    latitude: 8,
+    longitude: -75,
     power: 0.125,
     frequency: 907,
-    heightAGL: 1,
+    heightAGL: 99,
     antennaGain: 2,
   },
   receiver: {
