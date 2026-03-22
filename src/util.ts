@@ -1,3 +1,30 @@
+import type { IConfig } from "./config"
+import type { Result } from "./result"
+
+export type TaskType = "loadwasm" | "process"
+export type WorkerResponseType = "progress" | "result" | "wasmloaded"
+
+export type Task = {
+  id: number
+  type: TaskType
+  config?: IConfig
+}
+
+type WorkerResponse = {
+  task: Task
+  type: WorkerResponseType
+}
+
+export type WorkerProgress = {
+  progress: ProgressUpdate
+} & WorkerResponse
+
+export type WorkerResult = {
+  result: Result
+} & WorkerResponse
+
+export type WorkerWasmLoaded = {} & WorkerResponse
+
 export type ProgressUpdate = {
   value: number
   label: string

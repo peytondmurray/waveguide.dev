@@ -5,7 +5,7 @@ import { useEffect, useRef, useState } from "react"
 import Icon from "./logo.svg?react"
 import MapWidget from "./MapWidget"
 import Navbar from "./Navbar"
-import type { WorkerProgress, WorkerResult } from "./worker"
+import type { WorkerProgress, WorkerResult } from "./util"
 
 import "@mantine/core/styles.css"
 
@@ -38,8 +38,11 @@ export default function App() {
         setResults((res) => [...res, result])
         setActive(result.config.siteName)
       } else if (e.data.type === "progress") {
-        const progress = (e.data as WorkerProgress).progress
-        setProgress(progress)
+        const { task, progress } = e.data as WorkerProgress
+        setProgress((current) => {
+          current.set(task, progress)
+          return current
+        })
       } else if (e.data.type === "wasmloaded") {
         setWorkerLoaded(true)
       } else {

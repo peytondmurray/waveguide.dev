@@ -18,7 +18,7 @@ import type { IConfig } from "./config"
 export default function Navbar({ handleRun }: { handleRun: () => void }) {
   const [results, _setResults] = useAtom(resultsAtom)
   const [config, setConfig] = useAtom(configAtom)
-  const [progress, _setProgres] = useAtom(progressAtom)
+  const [progress, _setProgress] = useAtom(progressAtom)
 
   const validSiteName = results.every(
     (res) => res.config.siteName !== config.siteName,
@@ -281,11 +281,13 @@ export default function Navbar({ handleRun }: { handleRun: () => void }) {
           />
         </Group>
       </Stack>
-      <Progress.Root>
-        <Progress.Section value={progress.value}>
-          <Progress.Label>{progress.label}</Progress.Label>
-        </Progress.Section>
-      </Progress.Root>
+      {Array.from(progress).map(([task, progress]) => (
+        <Progress.Root key={task.id}>
+          <Progress.Section value={progress.value}>
+            <Progress.Label>{progress.label}</Progress.Label>
+          </Progress.Section>
+        </Progress.Root>
+      ))}
       <Stack className="section">
         {results.some((res) => res.config.siteName === config.siteName) ? (
           <Text>{`A site named '${config.siteName}' already exists!`}</Text>
