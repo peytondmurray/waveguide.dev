@@ -1,3 +1,4 @@
+import { XMLParser } from "fast-xml-parser"
 import type { MainModule } from "splat-web/splat"
 import { toCmap } from "./colormaps"
 import type { IConfig } from "./config"
@@ -22,14 +23,21 @@ const polarizationMap = new Map([
   ["vertical", 2],
 ])
 
-function toDataUrl(raster: ImageData): string {
-  const canvas = document.createElement("canvas")
-  canvas.width = raster.width
-  canvas.height = raster.height
-
+async function toDataUrl(raster: ImageData): Promise<string> {
+  const canvas = new OffscreenCanvas(raster.width, raster.height)
   const ctx = canvas.getContext("2d")
+
   ctx?.putImageData(raster, 0, 0)
-  return canvas.toDataURL()
+  const blob = await canvas.convertToBlob()
+
+  return await new Promise<string>((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onload = () => resolve(reader.result as string)
+    reader.onerror = () => reject(reader.error)
+    reader.onabort = () =>
+      reject(new Error("Cannot convert the ppm raster to data url"))
+    reader.readAsDataURL(blob)
+  })
 }
 
 function nextNonSpaceByte(arr: Uint8Array, start: number): number {
@@ -287,7 +295,7 @@ export async function runSplat(
     bounds: await getKmlBounds(fsManager, mod),
     config,
     raster,
-    dataUrl: toDataUrl(raster),
+    dataUrl: await toDataUrl(raster),
   }
 }
 
@@ -346,17 +354,13 @@ export async function getKmlBounds(
   fsManager: FSManager,
   mod: MainModule,
 ): Promise<Bounds> {
-  const doc = new DOMParser().parseFromString(
+  // Can't use DOMParser on a web worker (whyyyyy????)
+  const parser = new XMLParser()
+  const { north, south, east, west } = parser.parse(
     (await fsManager.readFile(mod, "output.kml", {
       encoding: "utf8",
     })) as string,
-    "text/xml",
-  )
+  ).kml.Folder.GroundOverlay.LatLonBox
 
-  return {
-    north: Number.parseFloat(doc.getElementsByTagName("north")[0].textContent),
-    south: Number.parseFloat(doc.getElementsByTagName("south")[0].textContent),
-    east: Number.parseFloat(doc.getElementsByTagName("east")[0].textContent),
-    west: Number.parseFloat(doc.getElementsByTagName("west")[0].textContent),
-  }
+  return { north, south, east, west }
 }

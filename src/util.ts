@@ -1,3 +1,8 @@
+export type ProgressUpdate = {
+  value: number
+  label: string
+}
+
 /**
  * Render a number or string as a string, left padded with a string.
  *

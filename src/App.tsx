@@ -1,67 +1,68 @@
 /// <reference types="vite-plugin-svgr/client" />
 import { AppShell, Burger, Group, MantineProvider } from "@mantine/core"
 import { useDisclosure } from "@mantine/hooks"
-import { useEffect, useState } from "react"
-import Splat, { type MainModule } from "splat-web/splat"
-import Srtm2sdf from "splat-web/srtm2sdf"
-import { FSManager } from "./fsManager"
-import { downloadTiles, generateSplatInputs, runSplat } from "./geoutil"
+import { useEffect, useRef, useState } from "react"
 import Icon from "./logo.svg?react"
 import MapWidget from "./MapWidget"
 import Navbar from "./Navbar"
+import type { WorkerProgress, WorkerResult } from "./worker"
 
 import "@mantine/core/styles.css"
 
 import "./App.css"
 import { useAtom } from "jotai"
-import {
-  activeAtom,
-  configAtom,
-  fsManagerAtom,
-  progressAtom,
-  resultsAtom,
-} from "./atoms"
+import { activeAtom, configAtom, progressAtom, resultsAtom } from "./atoms"
 
 export default function App() {
-  const [splatModule, setSplatModule] = useState<MainModule | null>(null)
-  const [srtm2sdfModule, setSrtm2sdfModule] = useState<MainModule | null>(null)
+  const [opened, { toggle }] = useDisclosure()
+  const [workerLoaded, setWorkerLoaded] = useState<boolean>(false)
+
   const [config, _setConfig] = useAtom(configAtom)
   const [_progress, setProgress] = useAtom(progressAtom)
-  const [opened, { toggle }] = useDisclosure()
-  const [results, setResults] = useAtom(resultsAtom)
+  const [_results, setResults] = useAtom(resultsAtom)
   const [_active, setActive] = useAtom(activeAtom)
-  const [fsManager, setFsManager] = useAtom(fsManagerAtom)
+
+  const workerRef = useRef<Worker>(null)
+  const taskId = useRef<number>(0)
 
   useEffect(() => {
-    Splat({ noInitialRun: true }).then((mod) => setSplatModule(mod))
-    Srtm2sdf({ noInitialRun: true }).then((mod) => setSrtm2sdfModule(mod))
-  }, [])
+    workerRef.current = new Worker(new URL("./worker.ts", import.meta.url), {
+      type: "module",
+    })
 
-  useEffect(() => {
-    if (splatModule === null || srtm2sdfModule === null) {
-      return
+    workerRef.current.onmessage = (
+      e: MessageEvent<WorkerProgress | WorkerResult>,
+    ) => {
+      if (e.data.type === "result") {
+        const result = (e.data as WorkerResult).result
+        setResults((res) => [...res, result])
+        setActive(result.config.siteName)
+      } else if (e.data.type === "progress") {
+        const progress = (e.data as WorkerProgress).progress
+        setProgress(progress)
+      } else if (e.data.type === "wasmloaded") {
+        setWorkerLoaded(true)
+      } else {
+        console.error("Malformed worker response received: ", e.data)
+      }
     }
-    setFsManager(new FSManager(splatModule, srtm2sdfModule))
-  }, [splatModule, srtm2sdfModule, setFsManager])
+
+    workerRef.current.postMessage({
+      id: taskId.current++,
+      type: "loadwasm",
+    })
+  }, [setResults, setProgress, setActive])
 
   async function handleRun() {
-    // If the wasm modules or the filesystem manager aren't ready, just exit early
-    if (splatModule === null || srtm2sdfModule === null || fsManager === null) {
-      return
+    if (workerRef.current) {
+      workerRef.current.postMessage({
+        id: taskId.current++,
+        type: "process",
+        config,
+      })
     }
-
-    await downloadTiles(
-      fsManager,
-      config.transmitter.latitude,
-      config.transmitter.longitude,
-      config.simulationOptions.maxRange,
-      setProgress,
-    )
-
-    await generateSplatInputs(fsManager, splatModule, config)
-    setResults([...results, await runSplat(fsManager, splatModule, config)])
-    setActive(config.siteName)
   }
+
   const [active, _setActive] = useAtom(activeAtom)
 
   return (
@@ -85,11 +86,7 @@ export default function App() {
         </AppShell.Header>
 
         <AppShell.Navbar>
-          {splatModule === null ? (
-            <p>Loading...</p>
-          ) : (
-            <Navbar handleRun={handleRun} />
-          )}
+          {workerLoaded ? <Navbar handleRun={handleRun} /> : <p>Loading...</p>}
         </AppShell.Navbar>
 
         <AppShell.Main>
