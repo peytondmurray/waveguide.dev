@@ -6,7 +6,13 @@ import type { FSManager } from "./fsManager"
 import type { Bounds, Result } from "./result"
 import type { Tile } from "./tile"
 
-import { clamp0to360, degToRad, padNumber, radToDeg } from "./util"
+import {
+  clamp0to360,
+  degToRad,
+  type ProgressUpdate,
+  padNumber,
+  radToDeg,
+} from "./util"
 
 const radioClimateMap = new Map([
   ["equatorial", 1],
@@ -211,16 +217,9 @@ export async function downloadTiles(
   lat: number,
   long: number,
   maxRange: number,
-  progressCallback: ({
-    value,
-    label,
-  }: {
-    value: number
-    label: string
-  }) => void,
+  progressCallback: (update: ProgressUpdate) => void,
 ) {
-  progressCallback({ value: 0, label: "Downloading tiles..." })
-  await fsManager.getSdfs(listTiles(lat, long, maxRange))
+  await fsManager.getSdfs(listTiles(lat, long, maxRange), progressCallback)
 }
 
 export async function runSplat(

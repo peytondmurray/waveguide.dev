@@ -1,6 +1,7 @@
 import { BlobReader, type FileEntry, ZipReader } from "@zip.js/zip.js"
 import type { MainModule } from "splat-web/splat"
 import type { Tile } from "./tile"
+import type { ProgressUpdate } from "./util"
 
 type SyncDirection = "MEMFS->IDBFS" | "IDBFS->MEMFS"
 
@@ -137,8 +138,14 @@ export class FSManager {
     return new Uint8Array(buf)
   }
 
-  async getSdfs(tiles: Tile[]) {
+  async getSdfs(
+    tiles: Tile[],
+    progressCallback: ({ value, label }: ProgressUpdate) => void,
+  ) {
     await this.mountAndSync(this.splatMod)
+
+    const total = tiles.length
+    let done = 0
 
     await Promise.all(
       tiles.map(async (tile) => {
@@ -172,6 +179,10 @@ export class FSManager {
             buf,
           )
         }
+        progressCallback({
+          value: 100 * (done++ / total),
+          label: "Downloading tiles...",
+        })
       }),
     )
 
