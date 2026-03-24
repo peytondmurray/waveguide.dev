@@ -180,7 +180,7 @@ export class FSManager {
           )
         }
         progressCallback({
-          value: 100 * (done++ / total),
+          value: 100 * (++done / total),
           label: "Downloading tiles...",
         })
       }),

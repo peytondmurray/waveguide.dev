@@ -45,7 +45,7 @@ interface IConfig {
 }
 
 const DefaultConfig: IConfig = {
-  siteName: "default",
+  siteName: "default0",
   transmitter: {
     latitude: 8,
     longitude: -75,

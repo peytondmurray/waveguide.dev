@@ -42,7 +42,6 @@ import type { Task } from "./util"
       transmitter.longitude,
       simulationOptions.maxRange,
       (progress) => {
-        console.log("Progress: ", { task, progress })
         self.postMessage({ task, type: "progress", progress })
       },
     )
@@ -53,7 +52,6 @@ import type { Task } from "./util"
   }
 
   self.onmessage = (e: MessageEvent<Task>) => {
-    console.log("Enqueueing task: ", e.data)
     queue.push(e.data)
     if (!processing) {
       processNext()

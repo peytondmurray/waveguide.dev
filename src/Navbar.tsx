@@ -27,7 +27,6 @@ export default function Navbar({ handleRun }: { handleRun: () => void }) {
   function startRun() {
     if (validSiteName) {
       handleRun()
-      console.log("Running! ", { config })
     }
   }
 
@@ -281,13 +280,15 @@ export default function Navbar({ handleRun }: { handleRun: () => void }) {
           />
         </Group>
       </Stack>
-      {Array.from(progress).map(([task, progress]) => (
-        <Progress.Root key={task.id}>
-          <Progress.Section value={progress.value}>
-            <Progress.Label>{progress.label}</Progress.Label>
-          </Progress.Section>
-        </Progress.Root>
-      ))}
+      <Stack>
+        {Object.entries(progress).map(([id, update]) => (
+          <Progress.Root key={id} size="xl">
+            <Progress.Section value={update.value}>
+              <Progress.Label>{update.label}</Progress.Label>
+            </Progress.Section>
+          </Progress.Root>
+        ))}
+      </Stack>
       <Stack className="section">
         {results.some((res) => res.config.siteName === config.siteName) ? (
           <Text>{`A site named '${config.siteName}' already exists!`}</Text>
