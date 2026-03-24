@@ -1,6 +1,13 @@
 import type { IConfig } from "./config"
 import type { Result } from "./result"
 
+export type Prediction = {
+  progress?: ProgressUpdate
+  result?: Result
+  config: IConfig
+  status: "pending" | "finished"
+}
+
 export type TaskType = "loadwasm" | "process"
 export type WorkerResponseType = "progress" | "result" | "wasmloaded"
 
