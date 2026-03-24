@@ -17,9 +17,9 @@ export default function App() {
   const [opened, { toggle }] = useDisclosure()
   const [workerLoaded, setWorkerLoaded] = useState<boolean>(false)
 
-  const [config, _setConfig] = useAtom(configAtom)
+  const [config, setConfig] = useAtom(configAtom)
   const [_progress, setProgress] = useAtom(progressAtom)
-  const [_results, setResults] = useAtom(resultsAtom)
+  const [results, setResults] = useAtom(resultsAtom)
   const [_active, setActive] = useAtom(activeAtom)
 
   const workerRef = useRef<Worker>(null)
@@ -30,18 +30,24 @@ export default function App() {
       type: "module",
     })
 
+    // Set up the main thread to respond to messages from the web worker
     workerRef.current.onmessage = (
       e: MessageEvent<WorkerProgress | WorkerResult>,
     ) => {
       if (e.data.type === "result") {
-        const result = (e.data as WorkerResult).result
+        const { task, result } = e.data as WorkerResult
+        // Remove the current task from the set of progress bars once a result has been produced
+        setProgress((current) => {
+          const { [task.id]: _, ...rest } = current
+          return rest
+        })
         setResults((res) => [...res, result])
         setActive(result.config.siteName)
       } else if (e.data.type === "progress") {
         const { task, progress } = e.data as WorkerProgress
+        console.log({ task, progress })
         setProgress((current) => {
-          current.set(task, progress)
-          return current
+          return { ...current, [task.id]: progress }
         })
       } else if (e.data.type === "wasmloaded") {
         setWorkerLoaded(true)
@@ -50,6 +56,7 @@ export default function App() {
       }
     }
 
+    // Initialize the worker by loading the wasm immediately
     workerRef.current.postMessage({
       id: taskId.current++,
       type: "loadwasm",
@@ -62,6 +69,18 @@ export default function App() {
         id: taskId.current++,
         type: "process",
         config,
+      })
+
+      // Automatically increment the site name so that we never get conflicting sitenames
+      // when we are just generating predictions
+      setConfig((current) => {
+        let nextnum = 0
+        while (
+          results.find(({ config }) => config.siteName === `default${nextnum}`)
+        ) {
+          nextnum++
+        }
+        return { ...current, siteName: `default${nextnum}` }
       })
     }
   }
