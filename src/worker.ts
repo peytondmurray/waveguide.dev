@@ -1,34 +1,8 @@
 import Splat, { type MainModule } from "splat-web/splat"
 import Srtm2sdf from "splat-web/srtm2sdf"
-import type { IConfig } from "./config"
 import { FSManager } from "./fsManager"
 import { downloadTiles, generateSplatInputs, runSplat } from "./geoutil"
-import type { Result } from "./result"
-import type { ProgressUpdate } from "./util"
-
-export type TaskType = "loadwasm" | "process"
-export type WorkerResponseType = "progress" | "result" | "wasmloaded"
-
-export type Task = {
-  id: number
-  type: TaskType
-  config?: IConfig
-}
-
-type WorkerResponse = {
-  task: Task
-  type: WorkerResponseType
-}
-
-export type WorkerProgress = {
-  progress: ProgressUpdate
-} & WorkerResponse
-
-export type WorkerResult = {
-  result: Result
-} & WorkerResponse
-
-export type WorkerWasmLoaded = {} & WorkerResponse
+import type { ProgressUpdate, Task } from "./util"
 
 // Make a block here to contain the scope of worker-only variables
 {
@@ -61,25 +35,30 @@ export type WorkerWasmLoaded = {} & WorkerResponse
       return
     }
 
+    const progressCallback = (progress: ProgressUpdate) => {
+      self.postMessage({ task, type: "progress", progress })
+    }
+
     const { transmitter, simulationOptions } = task.config
     await downloadTiles(
       fsmanager,
       transmitter.latitude,
       transmitter.longitude,
       simulationOptions.maxRange,
-      (progress) => {
-        console.log("Progress: ", { task, progress })
-        self.postMessage({ task, type: "progress", progress })
-      },
+      progressCallback,
     )
 
     await generateSplatInputs(fsmanager, splat, task.config)
-    const result = await runSplat(fsmanager, splat, task.config)
+    const result = await runSplat(
+      fsmanager,
+      splat,
+      task.config,
+      progressCallback,
+    )
     self.postMessage({ task, type: "result", result })
   }
 
   self.onmessage = (e: MessageEvent<Task>) => {
-    console.log("Enqueueing task: ", e.data)
     queue.push(e.data)
     if (!processing) {
       processNext()
@@ -89,6 +68,7 @@ export type WorkerWasmLoaded = {} & WorkerResponse
   function processNext() {
     if (queue.length === 0) {
       processing = false
+      return
     }
     processing = true
 

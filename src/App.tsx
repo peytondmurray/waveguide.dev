@@ -5,22 +5,21 @@ import { useEffect, useRef, useState } from "react"
 import Icon from "./logo.svg?react"
 import MapWidget from "./MapWidget"
 import Navbar from "./Navbar"
-import type { WorkerProgress, WorkerResult } from "./worker"
+import type { WorkerProgress, WorkerResult } from "./util"
 
 import "@mantine/core/styles.css"
 
 import "./App.css"
 import { useAtom } from "jotai"
-import { activeAtom, configAtom, progressAtom, resultsAtom } from "./atoms"
+import { activeAtom, configAtom, predictionAtom } from "./atoms"
 
 export default function App() {
   const [opened, { toggle }] = useDisclosure()
   const [workerLoaded, setWorkerLoaded] = useState<boolean>(false)
 
-  const [config, _setConfig] = useAtom(configAtom)
-  const [_progress, setProgress] = useAtom(progressAtom)
-  const [_results, setResults] = useAtom(resultsAtom)
+  const [config, setConfig] = useAtom(configAtom)
   const [_active, setActive] = useAtom(activeAtom)
+  const [predictions, setPredictions] = useAtom(predictionAtom)
 
   const workerRef = useRef<Worker>(null)
   const taskId = useRef<number>(0)
@@ -30,16 +29,34 @@ export default function App() {
       type: "module",
     })
 
+    // Set up the main thread to respond to messages from the web worker
     workerRef.current.onmessage = (
       e: MessageEvent<WorkerProgress | WorkerResult>,
     ) => {
       if (e.data.type === "result") {
-        const result = (e.data as WorkerResult).result
-        setResults((res) => [...res, result])
+        const { task, result } = e.data as WorkerResult
+
+        const siteName = task.config?.siteName
+        if (siteName) {
+          setPredictions((current) => {
+            const pred = current[siteName]
+            return {
+              ...current,
+              siteName: { ...pred, status: "finished", result },
+            }
+          })
+        }
         setActive(result.config.siteName)
       } else if (e.data.type === "progress") {
-        const progress = (e.data as WorkerProgress).progress
-        setProgress(progress)
+        const { task, progress } = e.data as WorkerProgress
+
+        const siteName = task.config?.siteName
+        if (siteName) {
+          setPredictions((current) => {
+            const pred = current[siteName]
+            return { ...current, siteName: { ...pred, progress } }
+          })
+        }
       } else if (e.data.type === "wasmloaded") {
         setWorkerLoaded(true)
       } else {
@@ -47,18 +64,37 @@ export default function App() {
       }
     }
 
+    // Initialize the worker by loading the wasm immediately
     workerRef.current.postMessage({
       id: taskId.current++,
       type: "loadwasm",
     })
-  }, [setResults, setProgress, setActive])
+  }, [setActive, setPredictions])
 
   async function handleRun() {
     if (workerRef.current) {
+      // Create a new prediction in the main thread, then message the worker to enqueue the task
+      taskId.current++
+      setPredictions((current) => {
+        return {
+          ...current,
+          [taskId.current]: { status: "pending", config },
+        }
+      })
       workerRef.current.postMessage({
-        id: taskId.current++,
+        id: taskId.current,
         type: "process",
         config,
+      })
+
+      // Automatically increment the site name so that we never get conflicting sitenames when we
+      // are just generating predictions
+      setConfig((current) => {
+        let nextnum = 0
+        while (Object.hasOwn(predictions, `default${nextnum}`)) {
+          nextnum++
+        }
+        return { ...current, siteName: `default${nextnum}` }
       })
     }
   }

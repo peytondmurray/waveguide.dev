@@ -11,23 +11,18 @@ import {
 import "./Navbar.css"
 
 import { useAtom } from "jotai"
-import { configAtom, progressAtom, resultsAtom } from "./atoms"
+import { configAtom, predictionAtom } from "./atoms"
 import { Colormaps } from "./colormaps"
 import type { IConfig } from "./config"
 
 export default function Navbar({ handleRun }: { handleRun: () => void }) {
-  const [results, _setResults] = useAtom(resultsAtom)
+  const [predictions, _setPredictions] = useAtom(predictionAtom)
   const [config, setConfig] = useAtom(configAtom)
-  const [progress, _setProgres] = useAtom(progressAtom)
 
-  const validSiteName = results.every(
-    (res) => res.config.siteName !== config.siteName,
-  )
-
+  const validSiteName = !Object.hasOwn(predictions, config.siteName)
   function startRun() {
     if (validSiteName) {
       handleRun()
-      console.log("Running! ", { config })
     }
   }
 
@@ -281,13 +276,23 @@ export default function Navbar({ handleRun }: { handleRun: () => void }) {
           />
         </Group>
       </Stack>
-      <Progress.Root>
-        <Progress.Section value={progress.value}>
-          <Progress.Label>{progress.label}</Progress.Label>
-        </Progress.Section>
-      </Progress.Root>
+      <Stack>
+        {Object.entries(predictions).map(([id, { progress }]) => {
+          if (progress) {
+            return (
+              <Progress.Root key={id} size="xl">
+                <Progress.Section value={progress.value}>
+                  <Progress.Label>{progress.label}</Progress.Label>
+                </Progress.Section>
+              </Progress.Root>
+            )
+          } else {
+            return null
+          }
+        })}
+      </Stack>
       <Stack className="section">
-        {results.some((res) => res.config.siteName === config.siteName) ? (
+        {Object.hasOwn(predictions, config.siteName) ? (
           <Text>{`A site named '${config.siteName}' already exists!`}</Text>
         ) : null}
         <Button onClick={startRun} color={validSiteName ? "blue" : "red"}>

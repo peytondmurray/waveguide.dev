@@ -9,7 +9,7 @@ import {
   TileLayer,
   useMapEvent,
 } from "react-leaflet"
-import { activeAtom, configAtom, resultsAtom } from "./atoms"
+import { activeAtom, configAtom, predictionAtom } from "./atoms"
 
 import "leaflet/dist/leaflet.css"
 import "./MapWidget.css"
@@ -32,7 +32,7 @@ function MapClickHandleComponent() {
 
 export default function MapWidget() {
   const [config, _setConfig] = useAtom(configAtom)
-  const [results, _setResults] = useAtom(resultsAtom)
+  const [predictions, _setPredictions] = useAtom(predictionAtom)
   const [active, setActive] = useAtom(activeAtom)
 
   function handleMarkerClick(event: LeafletMouseEvent, conf: IConfig) {
@@ -53,35 +53,40 @@ export default function MapWidget() {
         <Marker
           position={[config.transmitter.latitude, config.transmitter.longitude]}
         />
-        {results.map((result) => {
-          return (
-            <React.Fragment key={result.config.siteName}>
-              <Marker
-                key={`${result.config.siteName}-marker`}
-                position={[
-                  result.config.transmitter.latitude,
-                  result.config.transmitter.longitude,
-                ]}
-                eventHandlers={{
-                  click: (event) => handleMarkerClick(event, result.config),
-                }}
-              >
-                <Popup>{result.config.siteName}</Popup>
-              </Marker>
-              <ImageOverlay
-                key={`${result.config.siteName}-overlay`}
-                bounds={
-                  new LatLngBounds(
-                    [result.bounds.south, result.bounds.west],
-                    [result.bounds.north, result.bounds.east],
-                  )
-                }
-                url={result.dataUrl}
-                opacity={result.config.siteName === active ? 0.7 : 0}
-                zIndex={10}
-              />
-            </React.Fragment>
-          )
+        {Object.entries(predictions).map(([_, prediction]) => {
+          if (prediction.status === "finished" && prediction.result) {
+            const { config: conf, bounds, dataUrl } = prediction.result
+            return (
+              <React.Fragment key={conf.siteName}>
+                <Marker
+                  key={`${conf.siteName}-marker`}
+                  position={[
+                    conf.transmitter.latitude,
+                    conf.transmitter.longitude,
+                  ]}
+                  eventHandlers={{
+                    click: (event) => handleMarkerClick(event, conf),
+                  }}
+                >
+                  <Popup>{conf.siteName}</Popup>
+                </Marker>
+                <ImageOverlay
+                  key={`${conf.siteName}-overlay`}
+                  bounds={
+                    new LatLngBounds(
+                      [bounds.south, bounds.west],
+                      [bounds.north, bounds.east],
+                    )
+                  }
+                  url={dataUrl}
+                  opacity={conf.siteName === active ? 0.7 : 0}
+                  zIndex={10}
+                />
+              </React.Fragment>
+            )
+          } else {
+            return null
+          }
         })}
         <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
       </MapContainer>
