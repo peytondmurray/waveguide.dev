@@ -54,32 +54,32 @@ export default function MapWidget() {
           position={[config.transmitter.latitude, config.transmitter.longitude]}
         />
         {Object.entries(predictions).map(([_, prediction]) => {
-          const { config: resultConfig, result } = prediction
-          if (result && resultConfig) {
+          if (prediction.status === "finished" && prediction.result) {
+            const { config: conf, bounds, dataUrl } = prediction.result
             return (
-              <React.Fragment key={resultConfig.siteName}>
+              <React.Fragment key={conf.siteName}>
                 <Marker
-                  key={`${resultConfig.siteName}-marker`}
+                  key={`${conf.siteName}-marker`}
                   position={[
-                    resultConfig.transmitter.latitude,
-                    resultConfig.transmitter.longitude,
+                    conf.transmitter.latitude,
+                    conf.transmitter.longitude,
                   ]}
                   eventHandlers={{
-                    click: (event) => handleMarkerClick(event, resultConfig),
+                    click: (event) => handleMarkerClick(event, conf),
                   }}
                 >
-                  <Popup>{resultConfig.siteName}</Popup>
+                  <Popup>{conf.siteName}</Popup>
                 </Marker>
                 <ImageOverlay
-                  key={`${resultConfig.siteName}-overlay`}
+                  key={`${conf.siteName}-overlay`}
                   bounds={
                     new LatLngBounds(
-                      [result.bounds.south, result.bounds.west],
-                      [result.bounds.north, result.bounds.east],
+                      [bounds.south, bounds.west],
+                      [bounds.north, bounds.east],
                     )
                   }
-                  url={result.dataUrl}
-                  opacity={result.config.siteName === active ? 0.7 : 0}
+                  url={dataUrl}
+                  opacity={conf.siteName === active ? 0.7 : 0}
                   zIndex={10}
                 />
               </React.Fragment>
