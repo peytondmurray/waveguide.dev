@@ -226,6 +226,7 @@ export async function runSplat(
   fsManager: FSManager,
   mod: MainModule,
   config: IConfig,
+  progressCallback: (update: ProgressUpdate) => void,
 ): Promise<Result> {
   console.log("Syncing the IDBFS filesystem...")
   fsManager.mountAndSync(mod)

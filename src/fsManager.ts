@@ -145,7 +145,12 @@ export class FSManager {
     await this.mountAndSync(this.splatMod)
 
     const total = tiles.length
+
     let done = 0
+    progressCallback({
+      value: 100 * (++done / total),
+      label: "Downloading SRTM tiles...",
+    })
 
     await Promise.all(
       tiles.map(async (tile) => {
@@ -181,12 +186,18 @@ export class FSManager {
         }
         progressCallback({
           value: 100 * (++done / total),
-          label: "Downloading tiles...",
+          label: "Downloading SRTM tiles...",
         })
       }),
     )
 
     await this.mountAndSync(this.srtm2sdfMod)
+
+    done = 0
+    progressCallback({
+      value: 100 * (++done / total),
+      label: "Caching SRTM tiles to IDBFS...",
+    })
 
     await Promise.all(
       tiles.map(async (tile) => {
@@ -205,6 +216,10 @@ export class FSManager {
           })
           this.srtm2sdfMod.FS.writeFile(sdfPath, content)
         }
+        progressCallback({
+          value: 100 * (++done / total),
+          label: "Caching SRTM tiles to IDBFS...",
+        })
       }),
     )
 

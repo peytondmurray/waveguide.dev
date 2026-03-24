@@ -11,16 +11,15 @@ import "@mantine/core/styles.css"
 
 import "./App.css"
 import { useAtom } from "jotai"
-import { activeAtom, configAtom, progressAtom, resultsAtom } from "./atoms"
+import { activeAtom, configAtom, predictionAtom } from "./atoms"
 
 export default function App() {
   const [opened, { toggle }] = useDisclosure()
   const [workerLoaded, setWorkerLoaded] = useState<boolean>(false)
 
   const [config, setConfig] = useAtom(configAtom)
-  const [_progress, setProgress] = useAtom(progressAtom)
-  const [results, setResults] = useAtom(resultsAtom)
   const [_active, setActive] = useAtom(activeAtom)
+  const [predictions, setPredictions] = useAtom(predictionAtom)
 
   const workerRef = useRef<Worker>(null)
   const taskId = useRef<number>(0)
@@ -36,19 +35,28 @@ export default function App() {
     ) => {
       if (e.data.type === "result") {
         const { task, result } = e.data as WorkerResult
-        // Remove the current task from the set of progress bars once a result has been produced
-        setProgress((current) => {
-          const { [task.id]: _, ...rest } = current
-          return rest
-        })
-        setResults((res) => [...res, result])
+
+        const siteName = task.config?.siteName
+        if (siteName) {
+          setPredictions((current) => {
+            const pred = current[siteName]
+            return {
+              ...current,
+              siteName: { ...pred, status: "finished", result },
+            }
+          })
+        }
         setActive(result.config.siteName)
       } else if (e.data.type === "progress") {
         const { task, progress } = e.data as WorkerProgress
-        console.log({ task, progress })
-        setProgress((current) => {
-          return { ...current, [task.id]: progress }
-        })
+
+        const siteName = task.config?.siteName
+        if (siteName) {
+          setPredictions((current) => {
+            const pred = current[siteName]
+            return { ...current, siteName: { ...pred, progress } }
+          })
+        }
       } else if (e.data.type === "wasmloaded") {
         setWorkerLoaded(true)
       } else {
@@ -61,23 +69,29 @@ export default function App() {
       id: taskId.current++,
       type: "loadwasm",
     })
-  }, [setResults, setProgress, setActive])
+  }, [setActive, setPredictions])
 
   async function handleRun() {
     if (workerRef.current) {
+      // Create a new prediction in the main thread, then message the worker to enqueue the task
+      taskId.current++
+      setPredictions((current) => {
+        return {
+          ...current,
+          [taskId.current]: { status: "pending", config },
+        }
+      })
       workerRef.current.postMessage({
-        id: taskId.current++,
+        id: taskId.current,
         type: "process",
         config,
       })
 
-      // Automatically increment the site name so that we never get conflicting sitenames
-      // when we are just generating predictions
+      // Automatically increment the site name so that we never get conflicting sitenames when we
+      // are just generating predictions
       setConfig((current) => {
         let nextnum = 0
-        while (
-          results.find(({ config }) => config.siteName === `default${nextnum}`)
-        ) {
+        while (Object.hasOwn(predictions, `default${nextnum}`)) {
           nextnum++
         }
         return { ...current, siteName: `default${nextnum}` }

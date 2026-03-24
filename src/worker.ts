@@ -2,7 +2,7 @@ import Splat, { type MainModule } from "splat-web/splat"
 import Srtm2sdf from "splat-web/srtm2sdf"
 import { FSManager } from "./fsManager"
 import { downloadTiles, generateSplatInputs, runSplat } from "./geoutil"
-import type { Task } from "./util"
+import type { ProgressUpdate, Task } from "./util"
 
 // Make a block here to contain the scope of worker-only variables
 {
@@ -35,19 +35,26 @@ import type { Task } from "./util"
       return
     }
 
+    const progressCallback = (progress: ProgressUpdate) => {
+      self.postMessage({ task, type: "progress", progress })
+    }
+
     const { transmitter, simulationOptions } = task.config
     await downloadTiles(
       fsmanager,
       transmitter.latitude,
       transmitter.longitude,
       simulationOptions.maxRange,
-      (progress) => {
-        self.postMessage({ task, type: "progress", progress })
-      },
+      progressCallback,
     )
 
     await generateSplatInputs(fsmanager, splat, task.config)
-    const result = await runSplat(fsmanager, splat, task.config)
+    const result = await runSplat(
+      fsmanager,
+      splat,
+      task.config,
+      progressCallback,
+    )
     self.postMessage({ task, type: "result", result })
   }
 
