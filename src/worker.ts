@@ -1,5 +1,5 @@
-import Splat, { type MainModule } from "splat-web/splat"
-import Srtm2sdf from "splat-web/srtm2sdf"
+import Splat, { type SplatModule } from "splat-web/splat"
+import Srtm2sdf, { type MainModule } from "splat-web/srtm2sdf"
 import { FSManager } from "./fsManager"
 import { downloadTiles, generateSplatInputs, runSplat } from "./geoutil"
 import type { ProgressUpdate, Task } from "./util"
@@ -9,7 +9,7 @@ import type { ProgressUpdate, Task } from "./util"
   const queue: Task[] = []
   let processing = false
 
-  let splat: MainModule | null = null
+  let splat: SplatModule | null = null
   let srtm2sdf: MainModule | null = null
   let fsmanager: FSManager | null = null
 
@@ -49,6 +49,7 @@ import type { ProgressUpdate, Task } from "./util"
     )
 
     await generateSplatInputs(fsmanager, splat, task.config)
+
     const result = await runSplat(
       fsmanager,
       splat,

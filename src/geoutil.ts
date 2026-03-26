@@ -1,5 +1,5 @@
 import { XMLParser } from "fast-xml-parser"
-import type { MainModule } from "splat-web/splat"
+import type { SplatModule } from "splat-web/splat"
 import { toCmap } from "./colormaps"
 import type { IConfig } from "./config"
 import type { FSManager } from "./fsManager"
@@ -57,7 +57,11 @@ function nextNonSpaceByte(arr: Uint8Array, start: number): number {
   return i
 }
 
-function parsePpm(arr: Uint8Array, config: IConfig): ImageData {
+function parsePpm(
+  arr: Uint8Array,
+  config: IConfig,
+  progressCallback: (update: ProgressUpdate) => void,
+): ImageData {
   // P6\n2400 2400\n255\nRGB data, one byte after another. Spaces or newlines can be repeated.
 
   // Pass by the first 3 bytes: P6\n
@@ -69,6 +73,8 @@ function parsePpm(arr: Uint8Array, config: IConfig): ImageData {
   }
   let i = 3
   let width: number | null = null
+
+  progressCallback({ label: "Reading PPM data...", value: 0 })
 
   // Skip any spaces between 'P6\n' and the next byte representing a number
   // Advance until you reach ' ' or '\n', then slice out the number
@@ -136,6 +142,8 @@ function parsePpm(arr: Uint8Array, config: IConfig): ImageData {
       "Height and width of the splat output doesn't match the image pixel array size.",
     )
   }
+
+  progressCallback({ label: "Reading PPM data...", value: 100 })
 
   // No idea why tsc thinks this isn't valid, but we coerce the type here to make it okay
   return new ImageData(cmap as Uint8ClampedArray<ArrayBuffer>, width, height)
@@ -224,14 +232,15 @@ export async function downloadTiles(
 
 export async function runSplat(
   fsManager: FSManager,
-  mod: MainModule,
+  mod: SplatModule,
   config: IConfig,
-  _progressCallback: (update: ProgressUpdate) => void,
+  progressCallback: (update: ProgressUpdate) => void,
 ): Promise<Result> {
-  console.log("Syncing the IDBFS filesystem...")
   fsManager.mountAndSync(mod)
 
-  console.log("Running splat...")
+  mod.progress = (label: string, val: number, total: number) => {
+    progressCallback({ label, value: (100 * val) / total })
+  }
 
   mod.callMain([
     // txsite.qth
@@ -289,6 +298,7 @@ export async function runSplat(
       encoding: "binary",
     })) as Uint8Array,
     config,
+    progressCallback,
   )
 
   return {
@@ -301,7 +311,7 @@ export async function runSplat(
 
 export async function generateSplatInputs(
   fsManager: FSManager,
-  mod: MainModule,
+  mod: SplatModule,
   config: IConfig,
 ) {
   const climate = radioClimateMap.get(config.environment.radioClimate)
@@ -352,7 +362,7 @@ function calculateErpWatts(
 
 export async function getKmlBounds(
   fsManager: FSManager,
-  mod: MainModule,
+  mod: SplatModule,
 ): Promise<Bounds> {
   // Can't use DOMParser on a web worker (whyyyyy????)
   const parser = new XMLParser()
