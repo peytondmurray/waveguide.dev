@@ -20,7 +20,7 @@
     "react": "^19.2.4",
     "react-dom": "^19.2.4",
     "react-leaflet": "^5.0.0",
-    "splat-web": "link:../splat-web",
+    "splat-web": "^0.0.13",
     "vite-plugin-svgr": "^4.5.0"
   },
   "devDependencies": {
