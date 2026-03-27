@@ -334,6 +334,8 @@ export function toCmap(
 ): Uint8ClampedArray {
   const Y = rgbToY(rgb)
 
+  console.log({ Y })
+
   const cmapData = cm.get(name)
   if (cmapData === undefined) {
     throw new Error(`No colormap exists named ${name}. Aborting.`)

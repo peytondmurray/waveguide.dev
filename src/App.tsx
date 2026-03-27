@@ -5,7 +5,7 @@ import { useEffect, useRef, useState } from "react"
 import Icon from "./logo.svg?react"
 import MapWidget from "./MapWidget"
 import Navbar from "./Navbar"
-import type { WorkerProgress, WorkerResult } from "./util"
+import type { WorkerFailed, WorkerProgress, WorkerResult } from "./util"
 
 import "@mantine/core/styles.css"
 
@@ -36,13 +36,12 @@ export default function App() {
       if (e.data.type === "result") {
         const { task, result } = e.data as WorkerResult
 
-        const siteName = task.config?.siteName
-        if (siteName) {
+        const conf = task.config
+        if (conf) {
           setPredictions((current) => {
-            const pred = current[siteName]
             return {
               ...current,
-              siteName: { ...pred, status: "finished", result },
+              [conf.siteName]: { config: conf, status: "finished", result },
             }
           })
         }
@@ -50,15 +49,28 @@ export default function App() {
       } else if (e.data.type === "progress") {
         const { task, progress } = e.data as WorkerProgress
 
-        const siteName = task.config?.siteName
-        if (siteName) {
+        const conf = task.config
+        if (conf) {
           setPredictions((current) => {
-            const pred = current[siteName]
-            return { ...current, siteName: { ...pred, progress } }
+            return {
+              ...current,
+              [conf.siteName]: { config: conf, status: "pending", progress },
+            }
           })
         }
       } else if (e.data.type === "wasmloaded") {
         setWorkerLoaded(true)
+      } else if (e.data.type === "failed") {
+        const { task } = e.data as WorkerFailed
+        const conf = task.config
+        if (conf) {
+          setPredictions((current) => {
+            return {
+              ...current,
+              [conf.siteName]: { config: conf, status: "failed" },
+            }
+          })
+        }
       } else {
         console.error("Malformed worker response received: ", e.data)
       }
@@ -78,7 +90,7 @@ export default function App() {
       setPredictions((current) => {
         return {
           ...current,
-          [taskId.current]: { status: "pending", config },
+          [config.siteName]: { status: "pending", config },
         }
       })
       workerRef.current.postMessage({
@@ -91,7 +103,10 @@ export default function App() {
       // are just generating predictions
       setConfig((current) => {
         let nextnum = 0
-        while (Object.hasOwn(predictions, `default${nextnum}`)) {
+        while (
+          Object.hasOwn(predictions, `default${nextnum}`) ||
+          config.siteName === `default${nextnum}`
+        ) {
           nextnum++
         }
         return { ...current, siteName: `default${nextnum}` }

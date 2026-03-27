@@ -38,6 +38,7 @@ export default function MapWidget() {
   function handleMarkerClick(event: LeafletMouseEvent, conf: IConfig) {
     setActive(conf.siteName === active ? null : conf.siteName)
     event.originalEvent.stopPropagation()
+    event.originalEvent.preventDefault()
   }
 
   return (

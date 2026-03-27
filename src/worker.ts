@@ -40,13 +40,18 @@ import type { ProgressUpdate, Task } from "./util"
     }
 
     const { transmitter, simulationOptions } = task.config
-    await downloadTiles(
-      fsmanager,
-      transmitter.latitude,
-      transmitter.longitude,
-      simulationOptions.maxRange,
-      progressCallback,
-    )
+    try {
+      await downloadTiles(
+        fsmanager,
+        transmitter.latitude,
+        transmitter.longitude,
+        simulationOptions.maxRange,
+        progressCallback,
+      )
+    } catch (err) {
+      self.postMessage({ task, type: "failed", reason: err })
+      return
+    }
 
     await generateSplatInputs(fsmanager, splat, task.config)
 

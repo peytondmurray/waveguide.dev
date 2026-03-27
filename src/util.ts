@@ -4,8 +4,9 @@ import type { Result } from "./result"
 export type Prediction = {
   progress?: ProgressUpdate
   result?: Result
+  reason?: string
   config: IConfig
-  status: "pending" | "finished"
+  status: "pending" | "finished" | "failed"
 }
 
 export type TaskType = "loadwasm" | "process"
@@ -21,15 +22,13 @@ type WorkerResponse = {
   task: Task
   type: WorkerResponseType
 }
-
 export type WorkerProgress = {
   progress: ProgressUpdate
 } & WorkerResponse
-
 export type WorkerResult = {
   result: Result
 } & WorkerResponse
-
+export type WorkerFailed = {} & WorkerResponse
 export type WorkerWasmLoaded = {} & WorkerResponse
 
 export type ProgressUpdate = {
