@@ -1,5 +1,5 @@
 import { useAtom } from "jotai"
-import { LatLngBounds, type LeafletMouseEvent } from "leaflet"
+import L, { LatLngBounds, type LeafletMouseEvent } from "leaflet"
 import React from "react"
 import {
   ImageOverlay,
@@ -10,8 +10,8 @@ import {
   useMapEvent,
 } from "react-leaflet"
 import { activeAtom, configAtom, predictionAtom } from "./atoms"
-
 import "leaflet/dist/leaflet.css"
+
 import "./MapWidget.css"
 import type { IConfig } from "./config"
 
@@ -30,6 +30,13 @@ function MapClickHandleComponent() {
   return null
 }
 
+const icon = L.icon({
+  iconUrl: "/marker-icon.png",
+  shadowUrl: "/marker-shadow.png",
+  iconAnchor: [12, 41],
+  // popupAnchor: [-3, -76],
+})
+
 export default function MapWidget() {
   const [config, _setConfig] = useAtom(configAtom)
   const [predictions, _setPredictions] = useAtom(predictionAtom)
@@ -38,6 +45,7 @@ export default function MapWidget() {
   function handleMarkerClick(event: LeafletMouseEvent, conf: IConfig) {
     setActive(conf.siteName === active ? null : conf.siteName)
     event.originalEvent.stopPropagation()
+    event.originalEvent.preventDefault()
   }
 
   return (
@@ -52,6 +60,7 @@ export default function MapWidget() {
         <MapClickHandleComponent />
         <Marker
           position={[config.transmitter.latitude, config.transmitter.longitude]}
+          icon={icon}
         />
         {Object.entries(predictions).map(([_, prediction]) => {
           if (prediction.status === "finished" && prediction.result) {

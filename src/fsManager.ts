@@ -1,5 +1,6 @@
 import { BlobReader, type FileEntry, ZipReader } from "@zip.js/zip.js"
-import type { MainModule } from "splat-web/splat"
+import type { SplatModule } from "splat-web/splat"
+import type { MainModule } from "splat-web/srtm2sdf"
 import type { Tile } from "./tile"
 import type { ProgressUpdate } from "./util"
 
@@ -9,13 +10,13 @@ type SyncDirection = "MEMFS->IDBFS" | "IDBFS->MEMFS"
  * Class which manages the splat and srtm2sdf filesystems
  */
 export class FSManager {
-  splatMod: MainModule
+  splatMod: SplatModule
   srtm2sdfMod: MainModule
-  idbfsMount: MainModule | null
+  idbfsMount: SplatModule | MainModule | null
   idbfsMountPoint: string
   srtmgl3sPath: string
 
-  constructor(splatMod: MainModule, srtm2sdfMod: MainModule) {
+  constructor(splatMod: SplatModule, srtm2sdfMod: MainModule) {
     this.idbfsMount = null
     this.idbfsMountPoint = "/idbfs/"
     this.srtmgl3sPath = "/idbfs/srtmgl3s"
@@ -32,7 +33,7 @@ export class FSManager {
    *
    * @param target - Target module whose filesystem we should mount the IDBFS to
    */
-  async mountAndSync(target: MainModule) {
+  async mountAndSync(target: SplatModule | MainModule) {
     // If we're already attached to the target module's filesystem, do nothing
     if (this.idbfsMount === target) {
       return
@@ -69,7 +70,10 @@ export class FSManager {
    * @param syncDirection - The direction to sync: IDBFS->MEMFS or MEMFS->IDBFS
    * @returns A promise that resolves when syncing is done
    */
-  async syncFS(mod: MainModule, syncDirection: SyncDirection): Promise<void> {
+  async syncFS(
+    mod: SplatModule | MainModule,
+    syncDirection: SyncDirection,
+  ): Promise<void> {
     return new Promise((resolve, reject) => {
       mod.FS.syncfs(syncDirection === "IDBFS->MEMFS", (err: Error) => {
         if (err) {
@@ -227,13 +231,13 @@ export class FSManager {
   }
 
   // biome-ignore lint/suspicious/noExplicitAny: Just matching the emscripten FS types here...
-  async writeFile(target: MainModule, path: string, data: any, opts?: any) {
+  async writeFile(target: SplatModule, path: string, data: any, opts?: any) {
     await this.mountAndSync(target)
     target.FS.writeFile(path, data, opts)
   }
 
   async readFile(
-    target: MainModule,
+    target: SplatModule,
     path: string,
     // biome-ignore lint/suspicious/noExplicitAny: Just matching the emscripten FS types here...
     opts?: any,
