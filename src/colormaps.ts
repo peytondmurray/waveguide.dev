@@ -334,8 +334,6 @@ export function toCmap(
 ): Uint8ClampedArray {
   const Y = rgbToY(rgb)
 
-  console.log({ Y })
-
   const cmapData = cm.get(name)
   if (cmapData === undefined) {
     throw new Error(`No colormap exists named ${name}. Aborting.`)
@@ -350,7 +348,13 @@ export function toCmap(
     result[i++] = r
     result[i++] = g
     result[i++] = b
-    result[i++] = val === 255 ? 0 : 255
+
+    // SPLAT by default maps "no data" to 255, so we mask that off.
+    // For some reason, 0-signal regions also sometimes appear in the SPLAT output.ppm.
+    // These regions take the form of big sections of the map which overlay adjacent
+    // tiles. Not sure if this is a bug in how we're running simulations or in how
+    // we interpret the SPLAT output.
+    result[i++] = val === 255 || val === 0 ? 0 : 255
   }
   return result
 }

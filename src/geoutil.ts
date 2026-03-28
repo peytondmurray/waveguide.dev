@@ -62,22 +62,20 @@ function parsePpm(
   config: IConfig,
   progressCallback: (update: ProgressUpdate) => void,
 ): ImageData {
-  // P6\n2400 2400\n255\nRGB data, one byte after another. Spaces or newlines can be repeated.
+  // P6\nNx Ny\n255\nRGB data, one byte after another. Spaces or newlines can be repeated.
+  // where Nx and Ny are number of pixels in each direction
 
   // Pass by the first 3 bytes: P6\n
-  // Read until space
   const decoder = new TextDecoder()
-
   if (arr.length < 4) {
     throw new Error("Malformed ppm file. Aborting.")
   }
   let i = 3
-  let width: number | null = null
-
   progressCallback({ label: "Reading PPM data...", value: 0 })
 
   // Skip any spaces between 'P6\n' and the next byte representing a number
   // Advance until you reach ' ' or '\n', then slice out the number
+  let width: number | null = null
   i = nextNonSpaceByte(arr, i)
   for (let j = i; j < arr.length; j++) {
     if ([10, 32].includes(arr[j])) {
@@ -87,8 +85,8 @@ function parsePpm(
     }
   }
 
-  i = nextNonSpaceByte(arr, i)
   let height: number | null = null
+  i = nextNonSpaceByte(arr, i)
   // Advance until you hit ' ' (char code 32) or '\n' (char code 10)
   for (let j = i; j < arr.length; j++) {
     if ([10, 32].includes(arr[j])) {
@@ -123,19 +121,15 @@ function parsePpm(
 
   // ppm image files contain 3-tuples of (r, g, b) values. Each value is 1 byte
   // (if the max value < 256) or 2 bytes (if the max value is anything else)
+  // Let's not deal with 2-byte values; splat doesn't seem to use them, and anyway I have
+  // enough to worry about
   const valueSize = maxval < 256 ? 1 : 2
-
-  i = nextNonSpaceByte(arr, i)
-  // const nVals = (arr.length - j)/(3*valueSize)
-  // const rgb = new Array(nVals)
-
-  let rgb: Uint8ClampedArray
-  if (valueSize === 1) {
-    rgb = Uint8ClampedArray.from(arr.slice(i))
-  } else {
+  if (valueSize > 1) {
     throw new Error("Multibyte ppms not supported.")
   }
 
+  i = nextNonSpaceByte(arr, i)
+  const rgb = Uint8ClampedArray.from(arr.slice(i))
   const cmap = toCmap(rgb, config.display.colormap, 0, maxval)
   if (height * width * 4 !== cmap.length) {
     throw new Error(
