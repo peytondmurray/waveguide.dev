@@ -106,6 +106,12 @@ export class FSManager {
     )
   }
 
+  /**
+   * Check if a file is cached.
+   *
+   * @param fname - File to check
+   * @returns True if the file is cached, otherwise false
+   */
   isCached(fname: string): boolean {
     if (this.idbfsMount === null) {
       throw new Error(
@@ -142,6 +148,12 @@ export class FSManager {
     return new Uint8Array(buf)
   }
 
+  /**
+   * Get the SDFs associated with the input map tiles.
+   *
+   * @param tiles - Tiles for which SDFs are to be gotten
+   * @param progressCallback - Function to call to report progress back to the UI
+   */
   async getSdfs(
     tiles: Tile[],
     progressCallback: ({ value, label }: ProgressUpdate) => void,
@@ -230,12 +242,27 @@ export class FSManager {
     await this.mountAndSync(this.splatMod)
   }
 
+  /**
+   * Sync before writing a file to the filesystem.
+   *
+   * @param target - Module containing the EMFS to write to
+   * @param path - Path to the file to write
+   * @param data - Data to write
+   * @param opts - Any additional options to use when writing the file
+   */
   // biome-ignore lint/suspicious/noExplicitAny: Just matching the emscripten FS types here...
   async writeFile(target: SplatModule, path: string, data: any, opts?: any) {
     await this.mountAndSync(target)
     target.FS.writeFile(path, data, opts)
   }
 
+  /**
+   * Sync before reading a file from the filesystem
+   * @param target - Module containing the EMFS to read from
+   * @param path - Path to the file to read
+   * @param opts - Any additional options to use when reading the file
+   * @returns The data from the file
+   */
   async readFile(
     target: SplatModule,
     path: string,
