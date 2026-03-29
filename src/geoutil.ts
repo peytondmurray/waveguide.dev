@@ -29,6 +29,16 @@ const polarizationMap = new Map([
   ["vertical", 2],
 ])
 
+/**
+ * Convert a raster image to a data URL.
+ *
+ * See https://gist.github.com/vjekoart/47d0eb7ebcf006b0c90a0bee2cbaa648 for part of this, but
+ * this doesn't work in web workers (because they can't create a <canvas> element, i.e. manipulate
+ * the DOM... which I didn't want to do anyway? How is this still the best way to do this in 2026?)
+ *
+ * @param raster - Image to convert to a data URL
+ * @returns The image encoded in a data URL
+ */
 async function toDataUrl(raster: ImageData): Promise<string> {
   const canvas = new OffscreenCanvas(raster.width, raster.height)
   const ctx = canvas.getContext("2d")
@@ -46,6 +56,13 @@ async function toDataUrl(raster: ImageData): Promise<string> {
   })
 }
 
+/**
+ * Find the next index of a non-space byte.
+ *
+ * @param arr - Byte array to be parsed
+ * @param start - Starting position to search for the next non-space byte from
+ * @returns The index of the next non-space byte
+ */
 function nextNonSpaceByte(arr: Uint8Array, start: number): number {
   let i = start
   while (i < arr.length && [10, 32].includes(arr[i])) {
@@ -57,6 +74,15 @@ function nextNonSpaceByte(arr: Uint8Array, start: number): number {
   return i
 }
 
+/**
+ * Parse the PPM output file produced by splat into a colormapped ImageData ready for display.
+ *
+ * @param arr - Raw byte array containing the PPM data file. This is the raster image data produced
+ * by splat
+ * @param config - The configuration used used to produce the prediction
+ * @param progressCallback - Function which is to be used to report progress to the UI
+ * @returns An ImageData instance of the PPM data.
+ */
 function parsePpm(
   arr: Uint8Array,
   config: IConfig,
@@ -153,7 +179,7 @@ function parsePpm(
  * @param lat - Starting latitude
  * @param long - Starting longitude
  * @param maxRange - Range [m] of tiles to include from the starting latitude/longitude
- * @returns
+ * @returns A list of the tiles needed for the calculation
  */
 function listTiles(lat: number, long: number, maxRange: number): Tile[] {
   const rEarth = 6378.137
@@ -224,6 +250,15 @@ export async function downloadTiles(
   await fsManager.getSdfs(listTiles(lat, long, maxRange), progressCallback)
 }
 
+/**
+ * Run the main splat function to produce a prediction.
+ *
+ * @param fsManager - Filesystem manager to use to write to the EMFS
+ * @param mod - Splat WASM module
+ * @param config - Simulation configuration options
+ * @param progressCallback - Callback to report simulation progress
+ * @returns A result containing the predicted RF signal
+ */
 export async function runSplat(
   fsManager: FSManager,
   mod: SplatModule,
@@ -303,6 +338,13 @@ export async function runSplat(
   }
 }
 
+/**
+ * Generate the input files needed for SPLAT to run.
+ *
+ * @param fsManager - Filesystem manager to use to write to the EMFS
+ * @param mod - Splat WASM module
+ * @param config - Simulation configuration options
+ */
 export async function generateSplatInputs(
   fsManager: FSManager,
   mod: SplatModule,
@@ -346,6 +388,14 @@ export async function generateSplatInputs(
   await fsManager.syncFS(mod, "MEMFS->IDBFS")
 }
 
+/**
+ * Calculate the effective radiated power of the transmitter, in watts.
+ *
+ * @param txPower - Transmitter power
+ * @param txGain - Transmitter gain
+ * @param systemLoss - System loss
+ * @returns Power output by the system
+ */
 function calculateErpWatts(
   txPower: number,
   txGain: number,
@@ -354,6 +404,13 @@ function calculateErpWatts(
   return 10 ** ((txPower + txGain - systemLoss - 30) / 10)
 }
 
+/**
+ * Extract the bounds of the PPM data output by splat from the `output.kml` file for a prediction.
+ *
+ * @param fsManager - Filesystem manager to use to write to the EMFS
+ * @param mod - Splat WASM module
+ * @returns The bounds of the PPM data, latitude/longitude
+ */
 export async function getKmlBounds(
   fsManager: FSManager,
   mod: SplatModule,

@@ -15,6 +15,9 @@ import "leaflet/dist/leaflet.css"
 import "./MapWidget.css"
 import type { IConfig } from "./config"
 
+/**
+ * Handle clicks on a map, updating the config as needed, to move around the main marker.
+ */
 function MapClickHandleComponent() {
   const [config, setConfig] = useAtom(configAtom)
   useMapEvent("click", (e) => {

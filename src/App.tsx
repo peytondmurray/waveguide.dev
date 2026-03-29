@@ -83,6 +83,9 @@ export default function App() {
     })
   }, [setActive, setPredictions])
 
+  /**
+   * Handle the click of the "Run Simulation" button.
+   */
   async function handleRun() {
     if (workerRef.current) {
       // Create a new prediction in the main thread, then message the worker to enqueue the task

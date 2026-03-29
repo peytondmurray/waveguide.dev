@@ -70,7 +70,15 @@ export default function Navbar({ handleRun }: { handleRun: () => void }) {
     }
   }
 
-  function makeLabeledValues(values: string[]) {
+  /**
+   * Using a list of strings, generate a label and a config key for each string.
+   *
+   * @param values - Labels to turn into keys for passing to the config class
+   * @returns An array of the labels and keys for each item.
+   */
+  function makeLabeledValues(
+    values: string[],
+  ): { value: string; label: string }[] {
     return values.map((item) => {
       return { value: item.toLowerCase(), label: item }
     })

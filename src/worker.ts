@@ -13,6 +13,11 @@ import type { ProgressUpdate, Task } from "./util"
   let srtm2sdf: MainModule | null = null
   let fsmanager: FSManager | null = null
 
+  /**
+   * Load the WASM modules for SPLAT and SRTM2SDF.
+   *
+   * @param task - Task which kicked off the job to load the WASM modules
+   */
   async function loadWasm(task: Task) {
     const [splatmod, srtm2sdfmod] = await Promise.all([
       Splat({ noInitialRun: true }),
@@ -25,6 +30,11 @@ import type { ProgressUpdate, Task } from "./util"
     self.postMessage({ task, type: "wasmloaded" })
   }
 
+  /**
+   * Make a prediction about the RF propagation.
+   *
+   * @param task - Task which kicked off the job to make a prediction.
+   */
   async function process(task: Task) {
     if (task.config === undefined) {
       console.error("No config specified for process task")
@@ -71,6 +81,12 @@ import type { ProgressUpdate, Task } from "./util"
     }
   }
 
+  /**
+   * Process the next task in the queue.
+   *
+   * If there are no more tasks, stop working; otherwise, execute the first task before kicking off
+   * the next.
+   */
   function processNext() {
     if (queue.length === 0) {
       processing = false

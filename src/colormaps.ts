@@ -203,7 +203,7 @@ function formatPM(n: number, l: number): string {
 }
 
 /**
- * Get the requested colormap as an array of strings, with numbers scaled to the range [min, max]
+ * Get the requested colormap as an array of strings, with numbers scaled to the range [min, max].
  *
  * @param cmName - Name of the colormap
  * @param min - Value associated with the minimum value of the colormap
@@ -235,7 +235,7 @@ export function toScaledStringArray(
 
 // https://en.wikipedia.org/wiki/SRGB#Transfer_function_(%22gamma%22)
 /**
- *  Convert an sRGB pixel to an intensity value
+ *  Convert an sRGB pixel to an intensity value.
  *
  * @param val - sRGB pixel value to convert
  * @returns The intensity associated with the pixel value
@@ -251,7 +251,7 @@ function rgbToLin(val: number): number {
 }
 
 /**
- * Convert the RGB pixel value to convert to a single 'linearized' greyscale value
+ * Convert the RGB pixel value to convert to a single 'linearized' greyscale value.
  *
  * See https://en.wikipedia.org/wiki/Relative_luminance#Relative_luminance_and_%22gamma_encoded%22_colorspaces
  *
@@ -312,7 +312,10 @@ export function binaryLookup(cmap: number[][], value: number): number {
 }
 
 /**
- * Map a luminance value
+ * Calculate the color a value should be mapped to using a colormap, interpolating as needed.
+ *
+ * If a value falls between two of the levels of a colormap, the RGB values are linearly
+ * interpolated according to the value to be mapped.
  *
  * @param cmap - Mapped colormap: an array of [value, r, g, b] arrays
  * @param value - Luminance value to remap to rgba. Must exist on range [0, 1]
