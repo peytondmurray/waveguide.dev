@@ -13,7 +13,7 @@ import { activeAtom, configAtom, predictionAtom } from "./atoms"
 import "leaflet/dist/leaflet.css"
 
 import "./MapWidget.css"
-import type { IConfig } from "./config"
+import type { IConfig } from "./util"
 
 /**
  * Handle clicks on a map, updating the config as needed, to move around the main marker.

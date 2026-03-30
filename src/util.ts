@@ -1,5 +1,4 @@
-import type { IConfig } from "./config"
-import type { Result } from "./result"
+import type { Colormap } from "./colormaps"
 
 export type Prediction = {
   progress?: ProgressUpdate
@@ -10,6 +9,7 @@ export type Prediction = {
 }
 
 export type TaskType = "loadwasm" | "process"
+
 export type WorkerResponseType = "progress" | "result" | "wasmloaded"
 
 export type Task = {
@@ -22,19 +22,127 @@ type WorkerResponse = {
   task: Task
   type: WorkerResponseType
 }
+
 export type WorkerProgress = {
   progress: ProgressUpdate
 } & WorkerResponse
+
 export type WorkerResult = {
   result: Result
 } & WorkerResponse
+
 export type WorkerFailed = {} & WorkerResponse
+
 export type WorkerWasmLoaded = {} & WorkerResponse
 
 export type ProgressUpdate = {
   value: number
   label: string
 }
+
+export type Tile = {
+  ziphgtname: string
+  hgtname: string
+  sdfName: string
+  url: string
+}
+
+export type Bounds = {
+  north: number
+  south: number
+  east: number
+  west: number
+}
+
+export type Result = {
+  bounds: Bounds
+  config: IConfig
+  raster: ImageData
+  dataUrl: string
+}
+
+interface IConfig {
+  siteName: string
+  transmitter: {
+    latitude: number
+    longitude: number
+    power: number
+    frequency: number
+    heightAGL: number
+    antennaGain: number
+  }
+  receiver: {
+    sensitivity: number
+    heightAGL: number
+    antennaGain: number
+    cableLoss: number
+  }
+  environment: {
+    radioClimate:
+      | "equatorial"
+      | "continental subtropical"
+      | "maritime subtropical"
+      | "desert"
+      | "continental temperate"
+      | "maritime temperate (land)"
+      | "maritime temperate (sea)"
+    polarization: "horizontal" | "vertical"
+    clutterHeight: number
+    groundDielectric: number
+    groundConductivity: number
+    atmosphericBending: number
+  }
+  simulationOptions: {
+    simulationFraction: number
+    timeFraction: number
+    maxRange: number
+  }
+  display: {
+    minimumSignal: number
+    maximumSignal: number
+    colormap: Colormap
+    transparency: number
+  }
+}
+
+const DefaultConfig: IConfig = {
+  siteName: "default0",
+  transmitter: {
+    latitude: 8,
+    longitude: -75,
+    power: 0.125,
+    frequency: 907,
+    heightAGL: 99,
+    antennaGain: 2,
+  },
+  receiver: {
+    sensitivity: -130,
+    heightAGL: 1,
+    antennaGain: 2,
+    cableLoss: 2,
+  },
+  environment: {
+    radioClimate: "continental temperate",
+    polarization: "vertical",
+    clutterHeight: 1,
+    groundDielectric: 15,
+    groundConductivity: 0.005,
+    atmosphericBending: 301,
+  },
+  simulationOptions: {
+    simulationFraction: 95,
+    timeFraction: 95,
+    maxRange: 30,
+  },
+  display: {
+    minimumSignal: -130,
+    maximumSignal: -80,
+    colormap: "plasma",
+    transparency: 50,
+  },
+}
+
+export { type IConfig, DefaultConfig }
 
 /**
  * Render a number or string as a string, left padded with a string.

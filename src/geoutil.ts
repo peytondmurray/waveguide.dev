@@ -1,10 +1,8 @@
 import { XMLParser } from "fast-xml-parser"
 import type { SplatModule } from "splat-web/splat"
 import { toCmap } from "./colormaps"
-import type { IConfig } from "./config"
 import type { FSManager } from "./fsManager"
-import type { Bounds, Result } from "./result"
-import type { Tile } from "./tile"
+import type { Bounds, IConfig, Result, Tile } from "./util"
 
 import {
   clamp0to360,

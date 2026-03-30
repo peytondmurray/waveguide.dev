@@ -233,9 +233,10 @@ export function toScaledStringArray(
   })
 }
 
-// https://en.wikipedia.org/wiki/SRGB#Transfer_function_(%22gamma%22)
 /**
- *  Convert an sRGB pixel to an intensity value.
+ * Convert an sRGB pixel to an intensity value.
+ *
+ * See https://en.wikipedia.org/wiki/SRGB#Transfer_function_(%22gamma%22)
  *
  * @param val - sRGB pixel value to convert
  * @returns The intensity associated with the pixel value

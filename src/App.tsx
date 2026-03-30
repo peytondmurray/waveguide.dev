@@ -5,7 +5,12 @@ import { useEffect, useRef, useState } from "react"
 import Icon from "./logo.svg?react"
 import MapWidget from "./MapWidget"
 import Navbar from "./Navbar"
-import type { WorkerFailed, WorkerProgress, WorkerResult } from "./util"
+import type {
+  IConfig,
+  WorkerFailed,
+  WorkerProgress,
+  WorkerResult,
+} from "./util"
 
 import "@mantine/core/styles.css"
 
@@ -104,7 +109,7 @@ export default function App() {
 
       // Automatically increment the site name so that we never get conflicting sitenames when we
       // are just generating predictions
-      setConfig((current) => {
+      setConfig((current: IConfig) => {
         let nextnum = 0
         while (
           Object.hasOwn(predictions, `default${nextnum}`) ||

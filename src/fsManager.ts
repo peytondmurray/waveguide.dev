@@ -1,8 +1,7 @@
 import { BlobReader, type FileEntry, ZipReader } from "@zip.js/zip.js"
 import type { SplatModule } from "splat-web/splat"
 import type { MainModule } from "splat-web/srtm2sdf"
-import type { Tile } from "./tile"
-import type { ProgressUpdate } from "./util"
+import type { ProgressUpdate, Tile } from "./util"
 
 type SyncDirection = "MEMFS->IDBFS" | "IDBFS->MEMFS"
 

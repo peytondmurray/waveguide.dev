@@ -13,7 +13,7 @@ import "./Navbar.css"
 import { useAtom } from "jotai"
 import { configAtom, predictionAtom } from "./atoms"
 import { Colormaps } from "./colormaps"
-import type { IConfig } from "./config"
+import type { IConfig } from "./util"
 
 export default function Navbar({ handleRun }: { handleRun: () => void }) {
   const [predictions, _setPredictions] = useAtom(predictionAtom)

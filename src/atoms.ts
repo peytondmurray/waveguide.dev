@@ -1,7 +1,7 @@
 import { atom } from "jotai"
-import { DefaultConfig, type IConfig } from "./config"
 import type { FSManager } from "./fsManager"
 import type { Prediction } from "./util"
+import { DefaultConfig, type IConfig } from "./util"
 
 const configAtom = atom<IConfig>(DefaultConfig)
 const predictionAtom = atom<Record<string, Prediction>>({})
