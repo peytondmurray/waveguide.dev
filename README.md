@@ -29,6 +29,16 @@ I wanted to do this for a few reasons:
    that needed it, so I stopped paying for the domain. So I already knew some of
    what I'd need to do to get SPLAT compiled to WASM and working in the browser.
 
+## Development
+
+You'll need `pnpm` (or whatever tool) to install dependencies.
+
+1. `pnpm i`
+2. `pnpm dev`
+
+will start the local development server at
+[localhost:5173](http://localhost:5173).
+
 ## Known issues
 
 1. There's something slightly off when the predictions are displayed on the
@@ -53,9 +63,9 @@ A few notes about this project:
    talk about this in a blog post some time.
 2. I downloaded the entire SRTMGL3S (90m) elevation tileset and put it in a
    Cloudflare R2 bucket (free egress!). I could have just made requests to
-   <srtm.fasma.org> but then they'd run into CORS. It's easier and extremely
-   cheap to just re-host on Cloudflare R2, and use an edge function to pull
-   tiles from the bucket.
+   [srtm.fasma.org](srtm.fasma.org) but then they'd run into CORS. It's easier
+   and extremely cheap to just re-host on Cloudflare R2, and use an edge
+   function to pull tiles from the bucket.
 
    The original dataset supposedly ranges from 60° S to 60° N, but in practice
    not all tiles from these latitudes are present.
