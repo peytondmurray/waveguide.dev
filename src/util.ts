@@ -108,8 +108,8 @@ interface IConfig {
 const DefaultConfig: IConfig = {
   siteName: "default0",
   transmitter: {
-    latitude: 8,
-    longitude: -75,
+    latitude: 37.881492669188205,
+    longitude: -121.91447105204122,
     power: 0.125,
     frequency: 907,
     heightAGL: 99,
@@ -132,7 +132,7 @@ const DefaultConfig: IConfig = {
   simulationOptions: {
     simulationFraction: 95,
     timeFraction: 95,
-    maxRange: 30,
+    maxRange: 100,
   },
   display: {
     minimumSignal: -130,

@@ -18,7 +18,6 @@ import type { IConfig } from "./util"
 export default function Navbar({ handleRun }: { handleRun: () => void }) {
   const [predictions, _setPredictions] = useAtom(predictionAtom)
   const [config, setConfig] = useAtom(configAtom)
-
   const validSiteName = !Object.hasOwn(predictions, config.siteName)
   function startRun() {
     if (validSiteName) {

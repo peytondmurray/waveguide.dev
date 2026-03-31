@@ -1,7 +1,10 @@
 /// <reference types="vite-plugin-svgr/client" />
 import { AppShell, Burger, Group, MantineProvider } from "@mantine/core"
 import { useDisclosure } from "@mantine/hooks"
+import { Notifications, showNotification } from "@mantine/notifications"
+import { useAtom } from "jotai"
 import { useEffect, useRef, useState } from "react"
+import { activeAtom, configAtom, predictionAtom } from "./atoms"
 import Icon from "./logo.svg?react"
 import MapWidget from "./MapWidget"
 import Navbar from "./Navbar"
@@ -13,10 +16,9 @@ import type {
 } from "./util"
 
 import "@mantine/core/styles.css"
+import "@mantine/notifications/styles.css"
 
 import "./App.css"
-import { useAtom } from "jotai"
-import { activeAtom, configAtom, predictionAtom } from "./atoms"
 
 export default function App() {
   const [opened, { toggle }] = useDisclosure()
@@ -30,6 +32,10 @@ export default function App() {
   const taskId = useRef<number>(0)
 
   useEffect(() => {
+    if (workerRef.current !== null) {
+      return
+    }
+
     workerRef.current = new Worker(new URL("./worker.ts", import.meta.url), {
       type: "module",
     })
@@ -70,10 +76,12 @@ export default function App() {
         const conf = task.config
         if (conf) {
           setPredictions((current) => {
-            return {
-              ...current,
-              [conf.siteName]: { config: conf, status: "failed" },
-            }
+            const { [conf.siteName]: _, ...rest } = current
+            showNotification({
+              title: "Prediction failed",
+              message: `Failed to predict site ${conf.siteName}. Check the console log for details.`,
+            })
+            return rest
           })
         }
       } else {
@@ -126,6 +134,7 @@ export default function App() {
 
   return (
     <MantineProvider defaultColorScheme="dark">
+      <Notifications />
       <AppShell
         padding="md"
         header={{ height: 60 }}

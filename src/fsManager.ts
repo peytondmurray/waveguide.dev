@@ -167,7 +167,10 @@ export class FSManager {
       label: "Downloading SRTM tiles...",
     })
 
-    await Promise.all(
+    // Use allSettled here to guarantee that the progress callbacks are done being called
+    // by the time this resolves or is rejected. Otherwise we can have a failed fetch which
+    // still shows the progress bar as pending.
+    const fetchResult = await Promise.allSettled(
       tiles.map(async (tile) => {
         // Check if it's necessary to acquire the .hgt.zip file
         const zipHgtPath = `${this.srtmgl3sPath}/${tile.ziphgtname}`
@@ -206,6 +209,16 @@ export class FSManager {
       }),
     )
 
+    // https://stackoverflow.com/questions/73064240/property-reason-does-not-exist-on-type-promisesettledresultnever-even-tho
+    const errors = fetchResult
+      .filter((res): res is PromiseRejectedResult => {
+        return res.status === "rejected"
+      })
+      .map(({ reason }) => reason)
+    if (errors.length > 0) {
+      throw new Error(`Failed to fetch tiles. Errors: ${errors}`)
+    }
+
     await this.mountAndSync(this.srtm2sdfMod)
 
     done = 0
@@ -214,7 +227,7 @@ export class FSManager {
       label: "Caching SRTM tiles to IDBFS...",
     })
 
-    await Promise.all(
+    await Promise.allSettled(
       tiles.map(async (tile) => {
         const hgtPath = `${this.srtmgl3sPath}/${tile.hgtname}`
         const sdfPath = `${this.idbfsMountPoint}/${tile.sdfName}`
