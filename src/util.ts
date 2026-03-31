@@ -132,7 +132,7 @@ const DefaultConfig: IConfig = {
   simulationOptions: {
     simulationFraction: 95,
     timeFraction: 95,
-    maxRange: 100,
+    maxRange: 30,
   },
   display: {
     minimumSignal: -130,
