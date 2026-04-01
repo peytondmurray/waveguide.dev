@@ -3,13 +3,14 @@ import { AppShell, Burger, Group, MantineProvider } from "@mantine/core"
 import { useDisclosure } from "@mantine/hooks"
 import { Notifications, showNotification } from "@mantine/notifications"
 import { useAtom } from "jotai"
-import { useEffect, useRef, useState } from "react"
+import { type SetStateAction, useEffect, useRef, useState } from "react"
 import { activeAtom, configAtom, predictionAtom } from "./atoms"
 import Icon from "./logo.svg?react"
 import MapWidget from "./MapWidget"
 import Navbar from "./Navbar"
 import type {
   IConfig,
+  Prediction,
   WorkerFailed,
   WorkerProgress,
   WorkerResult,
@@ -19,23 +20,72 @@ import "@mantine/core/styles.css"
 import "@mantine/notifications/styles.css"
 import "./App.css"
 
+/**
+ * Add a completed prediction from the worker to the predictions shown on the map.
+ *
+ * @param e - Message from the worker
+ * @param setPredictions - State setter function for updating predictions
+ * @param setActive - State setter function for setting the active prediction
+ */
 function handleResult(
   e: MessageEvent<WorkerProgress | WorkerResult>,
-  setPredictions,
-  setActive,
+  setPredictions: (updater: SetStateAction<Record<string, Prediction>>) => void,
+  setActive: (obj: string) => void,
 ) {
   const { task, result } = e.data as WorkerResult
 
   const conf = task.config
   if (conf) {
-    setPredictions((current) => {
-      return {
-        ...current,
-        [conf.siteName]: { config: conf, status: "finished", result },
-      }
-    })
+    setPredictions((current) => ({
+      ...current,
+      [conf.siteName]: { config: conf, status: "finished", result },
+    }))
   }
   setActive(result.config.siteName)
+}
+
+/**
+ * Update the progress of an existing prediction.
+ *
+ * @param e - Message from the worker
+ * @param setPredictions - State setter function for updating the progress of a prediction
+ */
+function handleProgress(
+  e: MessageEvent<WorkerProgress | WorkerResult>,
+  setPredictions: (updater: SetStateAction<Record<string, Prediction>>) => void,
+) {
+  const { task, progress } = e.data as WorkerProgress
+  const conf = task.config
+  if (conf) {
+    setPredictions((current) => ({
+      ...current,
+      [conf.siteName]: { config: conf, status: "pending", progress },
+    }))
+  }
+}
+
+/**
+ * Remove a prediction when it fails to complete.
+ *
+ * @param e - Message from the worker
+ * @param setPredictions - State setter function for removing the in progress prediction.
+ */
+function handleFailed(
+  e: MessageEvent<WorkerProgress | WorkerResult>,
+  setPredictions: (updater: SetStateAction<Record<string, Prediction>>) => void,
+) {
+  const { task } = e.data as WorkerFailed
+  const conf = task.config
+  if (conf) {
+    setPredictions((current) => {
+      const { [conf.siteName]: _, ...rest } = current
+      showNotification({
+        title: "Prediction failed",
+        message: `Failed to predict site ${conf.siteName}. Check the console log for details.`,
+      })
+      return rest
+    })
+  }
 }
 
 export default function App() {
@@ -43,7 +93,7 @@ export default function App() {
   const [workerLoaded, setWorkerLoaded] = useState<boolean>(false)
 
   const [config, setConfig] = useAtom(configAtom)
-  const [_active, setActive] = useAtom(activeAtom)
+  const [active, setActive] = useAtom(activeAtom)
   const [predictions, setPredictions] = useAtom(predictionAtom)
 
   const workerRef = useRef<Worker>(null)
@@ -63,45 +113,13 @@ export default function App() {
       e: MessageEvent<WorkerProgress | WorkerResult>,
     ) => {
       if (e.data.type === "result") {
-        const { task, result } = e.data as WorkerResult
-
-        const conf = task.config
-        if (conf) {
-          setPredictions((current) => {
-            return {
-              ...current,
-              [conf.siteName]: { config: conf, status: "finished", result },
-            }
-          })
-        }
-        setActive(result.config.siteName)
+        handleResult(e, setPredictions, setActive)
       } else if (e.data.type === "progress") {
-        const { task, progress } = e.data as WorkerProgress
-
-        const conf = task.config
-        if (conf) {
-          setPredictions((current) => {
-            return {
-              ...current,
-              [conf.siteName]: { config: conf, status: "pending", progress },
-            }
-          })
-        }
+        handleProgress(e, setPredictions)
       } else if (e.data.type === "wasmloaded") {
         setWorkerLoaded(true)
       } else if (e.data.type === "failed") {
-        const { task } = e.data as WorkerFailed
-        const conf = task.config
-        if (conf) {
-          setPredictions((current) => {
-            const { [conf.siteName]: _, ...rest } = current
-            showNotification({
-              title: "Prediction failed",
-              message: `Failed to predict site ${conf.siteName}. Check the console log for details.`,
-            })
-            return rest
-          })
-        }
+        handleFailed(e, setPredictions)
       } else {
         console.error("Malformed worker response received: ", e.data)
       }
@@ -116,6 +134,9 @@ export default function App() {
 
   /**
    * Handle the click of the "Run Simulation" button.
+   *
+   * Kick off the prediction on the Web Worker. Then increment the current site name so the next
+   * prediction doesn't conflict with the name of the one you just initiated.
    */
   async function handleRun() {
     if (workerRef.current) {
@@ -147,8 +168,6 @@ export default function App() {
       })
     }
   }
-
-  const [active, _setActive] = useAtom(activeAtom)
 
   return (
     <MantineProvider defaultColorScheme="dark">
