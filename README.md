@@ -1,6 +1,6 @@
 # waveguide.dev
 <h1 align="center">
-<img src="https://raw.githubusercontent.com/peytondmurray/waveguide.dev/main/src/logo.svg" width="100">
+<img src="https://raw.githubusercontent.com/peytondmurray/waveguide.dev/main/logo-styled.svg" width="100">
 </h1><br>
 
 This project attempts to convert the fantastic
