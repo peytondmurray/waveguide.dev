@@ -2,62 +2,31 @@
 <!-- Created with Inkscape (http://www.inkscape.org/) -->
 
 <svg
-   width="167.07913mm"
-   height="148.57251mm"
-   viewBox="0 0 167.07914 148.57251"
+   width="91.517944mm"
+   height="79.031006mm"
+   viewBox="0 0 91.517945 79.031006"
    version="1.1"
    id="svg1"
-   inkscape:version="1.4.3 (0d15f75042, 2025-12-25)"
-   sodipodi:docname="logo.svg"
-   xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
-   xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
    xmlns="http://www.w3.org/2000/svg"
    xmlns:svg="http://www.w3.org/2000/svg">
-  <sodipodi:namedview
-     id="namedview1"
-     pagecolor="#ffffff"
-     bordercolor="#000000"
-     borderopacity="0.25"
-     inkscape:showpageshadow="2"
-     inkscape:pageopacity="0.0"
-     inkscape:pagecheckerboard="0"
-     inkscape:deskcolor="#d1d1d1"
-     inkscape:document-units="mm"
-     inkscape:zoom="1.0667571"
-     inkscape:cx="694.1599"
-     inkscape:cy="83.899137"
-     inkscape:window-width="2854"
-     inkscape:window-height="1724"
-     inkscape:window-x="0"
-     inkscape:window-y="0"
-     inkscape:window-maximized="1"
-     inkscape:current-layer="layer1"
-     showgrid="false" />
   <defs
      id="defs1" />
   <g
      inkscape:label="Layer 1"
      inkscape:groupmode="layer"
      id="layer1"
-     transform="translate(-24.665492,-90.310873)">
-    <path
-       sodipodi:type="star"
-       style="fill:none;stroke:#000000;stroke-width:6.40633;stroke-dasharray:none"
-       id="path1"
-       inkscape:flatsided="false"
-       sodipodi:sides="3"
-       sodipodi:cx="45.500324"
-       sodipodi:cy="80.249512"
-       sodipodi:r1="149.9727"
-       sodipodi:r2="74.986343"
-       sodipodi:arg1="0.51978124"
-       sodipodi:arg2="1.5669788"
-       inkscape:rounded="0"
-       inkscape:randomized="0"
-       d="m 175.66581,154.7395 -129.879224,0.49581 -129.879223,0.49583 64.510225,-112.726617 64.510212,-112.72662 65.369,112.2308 z"
-       inkscape:transform-center-x="-0.17658421"
-       inkscape:transform-center-y="23.538757"
-       transform="matrix(0.61685944,0,0,-0.63199797,79.953625,190.7704)"
-       inkscape:label="path1" />
+     transform="translate(-61.461986,-118.25455)">
+    <g
+       id="g5">
+      <path
+         style="fill:none;"
+         id="path3"
+         d="M 138.63222,32.672495 116.25095,71.437997 93.869675,110.2035 71.488402,71.437997 49.107129,32.672495 l 44.762546,0 z"
+         transform="translate(13.351282,86.082052)" />
+      <path
+         style="fill:none;"
+         d="m 61.746052,157.76926 c 4.331,-2.99 8.661855,-5.533 12.992854,-4.871 4.331,0.663 8.661855,4.344 12.992851,7.039 4.331,2.695 8.661271,3.6 12.992713,1.738 4.33143,-1.862 8.66142,-5.946 12.99285,-7.812 4.33144,-1.866 8.66142,-0.954 12.99286,1.738 4.33143,2.693 8.66142,6.371 12.99285,7.039 4.33143,0.668 8.66142,-1.881 12.99285,-4.871"
+         id="path5" />
+    </g>
   </g>
 </svg>

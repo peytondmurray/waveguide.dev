@@ -17,8 +17,26 @@ import type {
 
 import "@mantine/core/styles.css"
 import "@mantine/notifications/styles.css"
-
 import "./App.css"
+
+function handleResult(
+  e: MessageEvent<WorkerProgress | WorkerResult>,
+  setPredictions,
+  setActive,
+) {
+  const { task, result } = e.data as WorkerResult
+
+  const conf = task.config
+  if (conf) {
+    setPredictions((current) => {
+      return {
+        ...current,
+        [conf.siteName]: { config: conf, status: "finished", result },
+      }
+    })
+  }
+  setActive(result.config.siteName)
+}
 
 export default function App() {
   const [opened, { toggle }] = useDisclosure()
