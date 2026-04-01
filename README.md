@@ -1,4 +1,7 @@
 # waveguide.dev
+<h1 align="center">
+<img src="https://raw.githubusercontent.com/peytondmurray/waveguide.dev/main/src/logo.svg" width="100">
+</h1><br>
 
 This project attempts to convert the fantastic
 [meshtastic-site-planner](https://github.com/meshtastic/meshtastic-site-planner/)
@@ -97,8 +100,8 @@ Instead I need help with figuring out all the nuances of cross-compiling with
 emscripten and fiddling with the filesystems of the two different WASM modules
 and understanding why wasm64 wasn't going to work while wasm32 is just fine, and
 so on and so on, and Opus 4.6 was just useless for this kind of stuff. But for
-debugging it was occasionally helpful. I can point specifically to two instances
-where I was glad to have had it:
+debugging it was occasionally helpful. There were a few instances where I was
+glad to have had it though:
 
 - In the web worker an import statement I had written was importing a type, but
   I forgot to include the `type` keyword. Opus 4.6 caught it and for whatever

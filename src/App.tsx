@@ -5,6 +5,7 @@ import { Notifications, showNotification } from "@mantine/notifications"
 import { useAtom } from "jotai"
 import { type SetStateAction, useEffect, useRef, useState } from "react"
 import { activeAtom, configAtom, predictionAtom } from "./atoms"
+import Github from "./github.svg?react"
 import Icon from "./logo.svg?react"
 import MapWidget from "./MapWidget"
 import Navbar from "./Navbar"
@@ -93,7 +94,7 @@ export default function App() {
   const [workerLoaded, setWorkerLoaded] = useState<boolean>(false)
 
   const [config, setConfig] = useAtom(configAtom)
-  const [active, setActive] = useAtom(activeAtom)
+  const [_active, setActive] = useAtom(activeAtom)
   const [predictions, setPredictions] = useAtom(predictionAtom)
 
   const workerRef = useRef<Worker>(null)
@@ -183,10 +184,12 @@ export default function App() {
       >
         <AppShell.Header>
           <Burger opened={opened} onClick={toggle} hiddenFrom="sm" size="sm" />
-          <Group id="logoArea" align="flex-start">
+          <Group id="logoArea">
             <Icon />
             <h1 id="title">waveguide.dev</h1>
-            <h2>{active}</h2>
+            <a href="https://github.com/peytondmurray/waveguide.dev">
+              <Github />
+            </a>
           </Group>
         </AppShell.Header>
 
