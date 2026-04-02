@@ -5,7 +5,7 @@
 
 This project attempts to convert the fantastic
 [meshtastic-site-planner](https://github.com/meshtastic/meshtastic-site-planner/)
-and convert it to run entirely in the browser.
+into a tool that makes predictions entirely in the user's browser.
 
 Check it out at <https://waveguide.dev> now!
 
